@@ -216,7 +216,7 @@ func (exp *explorerUI) Home(w http.ResponseWriter, r *http.Request) {
 		BestBlock     *types.BlockBasic
 		BlockTally    []int
 		Consensus     int
-		Blocks        []*types.BlockBasic
+		Blocks        []HomeBlockRow
 		Conversions   *homeConversions
 		PercentChange float64
 	}{
@@ -226,7 +226,7 @@ func (exp *explorerUI) Home(w http.ResponseWriter, r *http.Request) {
 		BestBlock:      bestBlock,
 		BlockTally:     tallys,
 		Consensus:      consensus,
-		Blocks:         blocks,
+		Blocks:         buildHomeBlockRows(blocks),
 		Conversions:    conversions,
 		PercentChange:  homeInfo.PoolInfo.PercentTarget - 100,
 	})

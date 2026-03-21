@@ -8,6 +8,7 @@
         "at-rule-no-vendor-prefix": null,
         "value-keyword-case": null,
         "font-family-name-quotes": "always-unless-keyword",
-        "string-quotes": "double"
+        "string-quotes": "double",
+        "declaration-colon-newline-after": null
     }
 }

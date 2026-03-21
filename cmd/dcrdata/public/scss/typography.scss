@@ -209,3 +209,53 @@ a.grayed {
 .fw-bold .decimal-parts .int {
   padding-right: 0.2em;
 }
+
+.link-button {
+  // Reset button styles
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+
+  // Typography (same as Bootstrap links)
+  font: inherit;
+  line-height: inherit;
+
+  // Link appearance
+  color: var(--bs-link-color);
+  text-decoration: var(--bs-link-decoration);
+  cursor: pointer;
+
+  // Remove default button quirks
+  display: inline;
+
+  &:hover {
+    color: var(--bs-link-hover-color);
+    text-decoration: var(--bs-link-hover-decoration);
+  }
+
+  &:focus {
+    outline: 0;
+    text-decoration: var(--bs-link-hover-decoration);
+  }
+
+  &:focus-visible {
+    outline: 0;
+    box-shadow: var(
+      --bs-focus-ring-x,
+      0 0 0 0.25rem rgb(var(--bs-primary-rgb) / 25%)
+    );
+    border-radius: 0.25rem;
+  }
+
+  &:active {
+    color: var(--bs-link-hover-color);
+  }
+
+  &:disabled {
+    color: var(--bs-link-disabled-color, #6c757d);
+    pointer-events: none;
+    cursor: default;
+    text-decoration: none;
+  }
+}

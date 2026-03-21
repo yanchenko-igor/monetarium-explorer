@@ -81,3 +81,43 @@ body.darkBG .light-card {
 body.darkBG .dark-card {
   background-color: #333;
 }
+
+// SKA accordion sub-rows
+.ska-sub-row {
+  display: none;
+
+  &--visible {
+    display: table-row;
+    background-color: $card-bg-secondary;
+  }
+}
+
+body.darkBG .ska-sub-row--visible {
+  background-color: $card-bg-secondary-dark;
+}
+
+.ska-clickable {
+  cursor: pointer;
+}
+
+.last-blocks-table td,
+.last-blocks-table th {
+  white-space: nowrap;
+}
+
+.group-header {
+  border-bottom: 2px solid $progress-bg;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.group-var-col,
+.group-var {
+  border-left: 2px solid $progress-bg;
+}
+
+.group-ska-col,
+.group-ska {
+  border-left: 2px solid $progress-bg;
+}
