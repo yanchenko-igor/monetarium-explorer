@@ -10,7 +10,8 @@
         "watch": "webpack --watch --config webpack.dev.js",
         "analyze": "webpack --config webpack.analyze.js",
         "build": "webpack --config webpack.prod.js --progress --color",
-        "lint": "./node_modules/.bin/eslint public --ext .js --ext .jsx"
+        "lint": "./node_modules/.bin/eslint public --ext .js --ext .jsx",
+        "lint:fix": "./node_modules/.bin/eslint public --ext .js --ext .jsx --fix"
     },
     "repository": {
         "type": "git",
