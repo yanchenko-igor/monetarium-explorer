@@ -1,18 +1,18 @@
 // import 'core-js/stable';
 import 'regenerator-runtime/runtime'
 /* global require */
-import ws from './js/services/messagesocket_service'
 import { Application } from '@hotwired/stimulus'
 import { definitionsFromContext } from '@hotwired/stimulus-webpack-helpers'
-import { darkEnabled } from './js/services/theme_service'
 import globalEventBus from './js/services/event_bus_service'
+import ws from './js/services/messagesocket_service'
+import { darkEnabled } from './js/services/theme_service'
 
 require('./scss/application.scss')
 
 window.darkEnabled = darkEnabled
 
 const application = Application.start()
-const context = require.context('./js/controllers', true, /\.js$/)
+const context = require.context('./js/controllers', true, /(?<!\.test)\.js$/)
 application.load(definitionsFromContext(context))
 
 document.addEventListener('turbolinks:load', function (e) {
@@ -33,12 +33,12 @@ export function notifyNewBlock (newBlock) {
 }
 
 function getSocketURI (loc) {
-  const protocol = (loc.protocol === 'https:') ? 'wss' : 'ws'
+  const protocol = loc.protocol === 'https:' ? 'wss' : 'ws'
   return protocol + '://' + loc.host + '/ws'
 }
 
 function sleep (ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 async function createWebSocket (loc) {
@@ -56,7 +56,7 @@ async function createWebSocket (loc) {
     globalEventBus.publish('BLOCK_RECEIVED', newBlock)
   }
   ws.registerEvtHandler('newblock', updateBlockData)
-  ws.registerEvtHandler('exchange', e => {
+  ws.registerEvtHandler('exchange', (e) => {
     globalEventBus.publish('EXCHANGE_UPDATE', JSON.parse(e))
   })
 }
@@ -64,7 +64,7 @@ async function createWebSocket (loc) {
 // Debug logging can be enabled by entering logDebug(true) in the console.
 // Your setting will persist across sessions.
 window.loggingDebug = window.localStorage.getItem('loggingDebug') === '1'
-window.logDebug = yes => {
+window.logDebug = (yes) => {
   window.loggingDebug = yes
   window.localStorage.setItem('loggingDebug', yes ? '1' : '0')
   return 'debug logging set to ' + (yes ? 'true' : 'false')
