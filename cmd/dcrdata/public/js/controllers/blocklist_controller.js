@@ -61,10 +61,15 @@ function insertVARSubRow(tbody, newRow, block) {
   tr.appendChild(makeTd('text-end num', String(block.tx)))
   tr.appendChild(makeTd('text-end num', humanize.threeSigFigs(block.total)))
   tr.appendChild(makeTd('text-end', '—'))
-  tr.appendChild(makeTd('text-end num', humanize.bytes(block.size)))
+  tr.appendChild(
+    makeTd(
+      'text-end num d-none d-sm-table-cell d-md-none d-lg-table-cell',
+      humanize.bytes(block.size)
+    )
+  )
   tr.appendChild(makeTd('text-end', '—'))
   tr.appendChild(makeTd('text-end', '—'))
-  tr.appendChild(makeTd('text-end', '—'))
+  tr.appendChild(makeTd('text-end d-none d-sm-table-cell d-md-none d-lg-table-cell', '—'))
   tr.appendChild(makeTd('text-end', '—'))
 
   tbody.insertBefore(tr, newRow.nextSibling)
@@ -89,10 +94,12 @@ function insertSKASubRows(tbody, insertRef, subRows, blockHeight) {
     tr.appendChild(makeTd('text-end num', sub.txCount))
     tr.appendChild(makeTd('text-end', '—'))
     tr.appendChild(makeTd('text-end num', sub.amount))
-    tr.appendChild(makeTd('text-end num', sub.size))
+    tr.appendChild(
+      makeTd('text-end num d-none d-sm-table-cell d-md-none d-lg-table-cell', sub.size)
+    )
     tr.appendChild(makeTd('text-end', '—'))
     tr.appendChild(makeTd('text-end', '—'))
-    tr.appendChild(makeTd('text-end', '—'))
+    tr.appendChild(makeTd('text-end d-none d-sm-table-cell d-md-none d-lg-table-cell', '—'))
     tr.appendChild(makeTd('text-end', '—'))
 
     tbody.insertBefore(tr, ref)

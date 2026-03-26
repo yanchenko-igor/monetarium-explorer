@@ -7,10 +7,10 @@
         <th class="text-end" title="number of transactions">Txn</th>
         <th class="text-end" title="total VAR amount">VAR</th>
         <th class="text-end" title="total SKA amount">SKA</th>
-        <th class="text-end" title="total block size">Size</th>
+        <th class="text-end d-none d-sm-table-cell d-md-none d-lg-table-cell" title="total block size">Size</th>
         <th class="text-end" title="tickets voted">Vote</th>
         <th class="text-end" title="tickets purchased">Tkt</th>
-        <th class="text-end" title="tickets revoked">Rev</th>
+        <th class="text-end d-none d-sm-table-cell d-md-none d-lg-table-cell" title="tickets revoked">Rev</th>
         <th class="text-end" data-time-target="header" data-jstitle="Age" title="block age">Age</th>
       </tr>
     </thead>
@@ -31,10 +31,10 @@
         <td class="text-end num" data-type="tx">{{.Transactions}}</td>
         <td class="text-end num" data-type="var-amount">{{.VARAmount}}</td>
         <td class="text-end num" data-type="ska-amount">{{.SKAAmount}}</td>
-        <td class="text-end num" data-type="size">{{.FormattedBytes}}</td>
+        <td class="text-end num d-none d-sm-table-cell d-md-none d-lg-table-cell" data-type="size">{{.FormattedBytes}}</td>
         <td class="text-end num" data-type="votes">{{.Voters}}</td>
         <td class="text-end num" data-type="tickets">{{.FreshStake}}</td>
-        <td class="text-end num" data-type="revocations">{{.Revocations}}</td>
+        <td class="text-end num d-none d-sm-table-cell d-md-none d-lg-table-cell" data-type="revocations">{{.Revocations}}</td>
         <td class="text-end num" data-type="age" data-time-target="age" data-age="{{.BlockTime.UNIX}}">
           {{.BlockTime.DatetimeWithoutTZ}}
         </td>
@@ -44,10 +44,10 @@
         <td class="text-end num">{{.VARTxCount}}</td>
         <td class="text-end num">{{.VARAmount}}</td>
         <td class="text-end">—</td>
-        <td class="text-end num">{{.VARSize}}</td>
+        <td class="text-end num d-none d-sm-table-cell d-md-none d-lg-table-cell">{{.VARSize}}</td>
         <td class="text-end">—</td>
         <td class="text-end">—</td>
-        <td class="text-end">—</td>
+        <td class="text-end d-none d-sm-table-cell d-md-none d-lg-table-cell">—</td>
         <td class="text-end">—</td>
       </tr>
       {{range .SKASubRows}}
@@ -56,10 +56,10 @@
         <td class="text-end num">{{.TxCount}}</td>
         <td class="text-end">—</td>
         <td class="text-end num">{{.Amount}}</td>
-        <td class="text-end num">{{.Size}}</td>
+        <td class="text-end num d-none d-sm-table-cell d-md-none d-lg-table-cell">{{.Size}}</td>
         <td class="text-end">—</td>
         <td class="text-end">—</td>
-        <td class="text-end">—</td>
+        <td class="text-end d-none d-sm-table-cell d-md-none d-lg-table-cell">—</td>
         <td class="text-end">—</td>
       </tr>
       {{end}}
