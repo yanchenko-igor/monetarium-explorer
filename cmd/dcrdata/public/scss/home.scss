@@ -137,25 +137,29 @@ $col-min-widths: (
   cursor: pointer;
 }
 
-// Hover and expanded backgrounds
-/* stylelint-disable no-descending-specificity */
-.last-blocks-table .block-row-expandable:hover td {
-  background-color: $block-row-hover;
-}
-
 .last-blocks-table .block-row-expandable.is-expanded td {
   border-bottom-color: transparent;
 }
 
-.last-blocks-table .block-row-expandable.is-expanded:hover td {
-  background-color: $block-row-hover;
+// Hover and expanded backgrounds
+// 1. Desktop Hover: Only applies when a real mouse/pointer is used
+@media (hover: hover) and (pointer: fine) {
+  .last-blocks-table .block-row-expandable:hover td {
+    background-color: $block-row-hover;
+  }
+
+  body.darkBG .last-blocks-table .block-row-expandable:hover td {
+    background-color: $block-row-hover-dark;
+  }
 }
 
-body.darkBG .last-blocks-table .block-row-expandable:hover td {
-  background-color: $block-row-hover-dark;
-}
+// 2. Kill sticky hover on mobile
+@media (hover: none) {
+  .last-blocks-table .block-row-expandable:hover td {
+    background-color: inherit;
+  }
 
-body.darkBG .last-blocks-table .block-row-expandable.is-expanded:hover td {
-  background-color: $block-row-hover-dark;
+  body.darkBG .last-blocks-table .block-row-expandable:hover td {
+    background-color: inherit;
+  }
 }
-/* stylelint-enable no-descending-specificity */
