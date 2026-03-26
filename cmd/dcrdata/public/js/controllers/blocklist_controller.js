@@ -2,6 +2,7 @@ import { Controller } from '@hotwired/stimulus'
 import humanize from '../helpers/humanize_helper'
 import globalEventBus from '../services/event_bus_service'
 
+// TODO: remove mock data once the real SKA backend is wired up.
 const mockSKATokens = [
   { name: 'SKA-1', txs: 42, amount: 1_250_000, size: 8_400 },
   { name: 'SKA-2', txs: 17, amount: 450_000, size: 3_200 },
@@ -44,15 +45,14 @@ function makeTd(className, text) {
   return td
 }
 
-// Insert a VAR sub-row immediately after newRow (10-column layout).
+// Insert a VAR sub-row immediately after newRow (9-column layout).
 function insertVARSubRow(tbody, newRow, block) {
   const tr = document.createElement('tr')
   tr.className = 'ska-sub-row'
   tr.dataset.skaAccordionTarget = 'subRow'
   tr.dataset.blockId = String(block.height)
 
-  tr.appendChild(makeTd('sticky-col'))
-  const labelTd = makeTd('token-label-col')
+  const labelTd = makeTd('text-start ps-1 sticky-col')
   const labelSpan = document.createElement('span')
   labelSpan.className = 'sub-row-label'
   labelSpan.textContent = 'VAR'
@@ -71,7 +71,7 @@ function insertVARSubRow(tbody, newRow, block) {
   return tr
 }
 
-// Insert SKA sub-rows after insertRef (10-column layout).
+// Insert SKA sub-rows after insertRef (9-column layout).
 function insertSKASubRows(tbody, insertRef, subRows, blockHeight) {
   const ref = insertRef.nextSibling
   for (const sub of subRows) {
@@ -80,8 +80,7 @@ function insertSKASubRows(tbody, insertRef, subRows, blockHeight) {
     tr.dataset.skaAccordionTarget = 'subRow'
     tr.dataset.blockId = String(blockHeight)
 
-    tr.appendChild(makeTd('sticky-col'))
-    const labelTd = makeTd('token-label-col')
+    const labelTd = makeTd('text-start ps-1 sticky-col')
     const badge = document.createElement('span')
     badge.className = 'sub-row-label'
     badge.textContent = sub.tokenType
@@ -162,8 +161,6 @@ export default class extends Controller {
           newTd.appendChild(link)
           break
         }
-        case 'token-label':
-          break
         case 'tx':
           newTd.textContent = String(block.tx)
           break

@@ -21,15 +21,15 @@ type HomeBlockRow struct {
 	VARAmount  string // threeSigFigs(BlockBasic.Total)
 	VARSize    string // BlockBasic.FormattedBytes (reused)
 
-	// SKA group (cols 11-13) — mocked until the SKA backend is available.
-	// Future: replace these string fields with a big-number type (e.g.
+	// SKA group — mocked until the SKA backend is available.
+	// Future: replace this string field with a big-number type (e.g.
 	// shopspring/decimal) once the real backend supplies raw SKA amounts.
-	SKATxCount string // pre-formatted aggregate tx count
-	SKAAmount  string // pre-formatted aggregate amount
-	SKASize    string // pre-formatted aggregate size
+	// SKATxCount and SKASize are intentionally omitted: the template shows
+	// only the aggregate SKA amount in the parent row; per-type breakdowns
+	// are in SKASubRows.
+	SKAAmount string // pre-formatted aggregate amount
 
-	// Accordion control — computed once so the template needs no numeric logic.
-	HasSKAData bool        // true when at least one sub-row exists
+	// Accordion sub-rows — per-SKA-type breakdown.
 	SKASubRows []SKASubRow // per-SKA-type breakdown rows
 }
 
@@ -52,7 +52,7 @@ func buildHomeBlockRows(blocks []*types.BlockBasic) []HomeBlockRow {
 		if b == nil {
 			continue
 		}
-		skaTx, skaAmt, skaSz, subRows := mockSKAData(b.Height)
+		_, skaAmt, _, subRows := mockSKAData(b.Height)
 		rows = append(rows, HomeBlockRow{
 			Height:         b.Height,
 			Hash:           b.Hash,
@@ -65,10 +65,7 @@ func buildHomeBlockRows(blocks []*types.BlockBasic) []HomeBlockRow {
 			VARTxCount:     b.Transactions,
 			VARAmount:      threeSigFigs(b.Total),
 			VARSize:        b.FormattedBytes,
-			SKATxCount:     skaTx,
 			SKAAmount:      skaAmt,
-			SKASize:        skaSz,
-			HasSKAData:     len(subRows) > 0,
 			SKASubRows:     subRows,
 		})
 	}

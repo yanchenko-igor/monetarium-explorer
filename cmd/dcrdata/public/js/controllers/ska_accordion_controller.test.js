@@ -28,18 +28,11 @@ const { default: SkaAccordionController } = await import('./ska_accordion_contro
 function buildDOM(blockId, subRowCount) {
   const tbody = document.createElement('tbody')
 
-  // Block row
+  // Block row — the whole row is the click target (data-action on the tr).
   const blockRow = document.createElement('tr')
   blockRow.dataset.blockId = String(blockId)
   blockRow.dataset.skaAccordionTarget = 'blockRow'
   tbody.appendChild(blockRow)
-
-  // SKA clickable cell (only present when there is SKA data)
-  if (subRowCount > 0) {
-    const td = document.createElement('td')
-    td.className = 'ska-clickable'
-    blockRow.appendChild(td)
-  }
 
   // Sub-rows
   const subRows = []
@@ -63,13 +56,13 @@ function buildDOM(blockId, subRowCount) {
 }
 
 /**
- * Simulate a click on the first SKA cell of a block row, as toggle() expects.
+ * Simulate a row-level click as toggle() expects — currentTarget is the tr itself.
  */
-function clickSKACell(blockRow, ctrl) {
-  const td = blockRow.querySelector('td.ska-clickable') || blockRow
-  const event = { currentTarget: td }
-  // toggle() calls event.currentTarget.closest('tr') — make it work for both cases
-  td.closest = () => blockRow
+function clickRow(blockRow, ctrl) {
+  // toggle() calls event.currentTarget.closest('tr').
+  // Patch closest on the row element so it works on detached jsdom nodes.
+  blockRow.closest = (sel) => (sel === 'tr' ? blockRow : null)
+  const event = { currentTarget: blockRow, target: blockRow }
   ctrl.toggle(event)
 }
 
@@ -81,19 +74,14 @@ describe('ska_accordion_controller — unit tests', () => {
   describe('toggle() with no sub-rows (HasSKAData = false)', () => {
     it('does not add is-expanded to the block row', () => {
       const { blockRow, ctrl } = buildDOM(42, 0)
-      // Simulate a direct call (no data-action wiring, but guard must still hold)
-      const td = document.createElement('td')
-      td.closest = () => blockRow
-      ctrl.toggle({ currentTarget: td })
+      clickRow(blockRow, ctrl)
       expect(blockRow.classList.contains('is-expanded')).toBe(false)
     })
 
     it('does not mutate any element in the tbody', () => {
       const { tbody, blockRow, ctrl } = buildDOM(42, 0)
       const before = tbody.innerHTML
-      const td = document.createElement('td')
-      td.closest = () => blockRow
-      ctrl.toggle({ currentTarget: td })
+      clickRow(blockRow, ctrl)
       expect(tbody.innerHTML).toBe(before)
     })
   })
@@ -106,24 +94,24 @@ describe('ska_accordion_controller — unit tests', () => {
     })
 
     it('adds ska-sub-row--visible to all sub-rows on first click', () => {
-      clickSKACell(blockRow, ctrl)
+      clickRow(blockRow, ctrl)
       subRows.forEach((r) => expect(r.classList.contains('ska-sub-row--visible')).toBe(true))
     })
 
     it('adds is-expanded to the block row on first click', () => {
-      clickSKACell(blockRow, ctrl)
+      clickRow(blockRow, ctrl)
       expect(blockRow.classList.contains('is-expanded')).toBe(true)
     })
 
     it('removes ska-sub-row--visible on second click (collapse)', () => {
-      clickSKACell(blockRow, ctrl)
-      clickSKACell(blockRow, ctrl)
+      clickRow(blockRow, ctrl)
+      clickRow(blockRow, ctrl)
       subRows.forEach((r) => expect(r.classList.contains('ska-sub-row--visible')).toBe(false))
     })
 
     it('removes is-expanded on second click (collapse)', () => {
-      clickSKACell(blockRow, ctrl)
-      clickSKACell(blockRow, ctrl)
+      clickRow(blockRow, ctrl)
+      clickRow(blockRow, ctrl)
       expect(blockRow.classList.contains('is-expanded')).toBe(false)
     })
   })
@@ -137,9 +125,6 @@ describe('ska_accordion_controller — unit tests', () => {
         const blockRow = document.createElement('tr')
         blockRow.dataset.blockId = String(id)
         blockRow.dataset.skaAccordionTarget = 'blockRow'
-        const td = document.createElement('td')
-        td.className = 'ska-clickable'
-        blockRow.appendChild(td)
         tbody.appendChild(blockRow)
 
         const subs = []
@@ -166,7 +151,7 @@ describe('ska_accordion_controller — unit tests', () => {
       )
 
       // Click block 100
-      clickSKACell(row1, ctrl)
+      clickRow(row1, ctrl)
 
       // Block 100 sub-rows expanded
       subs1.forEach((r) => expect(r.classList.contains('ska-sub-row--visible')).toBe(true))
@@ -195,8 +180,8 @@ describe('ska_accordion_controller — property tests', () => {
         const initialBlockRowClass = blockRow.className
 
         // Expand then collapse
-        clickSKACell(blockRow, ctrl)
-        clickSKACell(blockRow, ctrl)
+        clickRow(blockRow, ctrl)
+        clickRow(blockRow, ctrl)
 
         // All classes must be restored
         subRows.forEach((r, i) => expect(r.className).toBe(initialSubRowClasses[i]))
@@ -211,12 +196,7 @@ describe('ska_accordion_controller — property tests', () => {
       fc.property(fc.integer({ min: 1, max: 999999 }), (blockId) => {
         const { tbody, blockRow, ctrl } = buildDOM(blockId, 0)
         const before = tbody.innerHTML
-
-        // Attempt to trigger toggle directly (no data-action on cells, but guard must hold)
-        const td = document.createElement('td')
-        td.closest = () => blockRow
-        ctrl.toggle({ currentTarget: td })
-
+        clickRow(blockRow, ctrl)
         expect(tbody.innerHTML).toBe(before)
         expect(blockRow.classList.contains('is-expanded')).toBe(false)
       })

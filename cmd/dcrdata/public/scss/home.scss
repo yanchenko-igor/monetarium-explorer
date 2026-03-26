@@ -101,12 +101,42 @@ body.darkBG .ska-sub-row--visible {
   white-space: nowrap;
 }
 
+// Column minimum widths — single source of truth.
+// Sized to the widest expected content so expanding sub-rows never shift columns.
+// Formula: max-content-chars × 1ch + Bootstrap cell padding (0.5rem/side = 1rem total).
+// Col  Max content             chars  min-width
+// 1    "1,878,074" / "SKA-255"   9ch  calc(9ch + 1rem)
+// 2    Txn "9999"                4ch  calc(4ch + 1rem)
+// 3    VAR "100.00B"             7ch  calc(7ch + 1rem)
+// 4    SKA "100.00B"             7ch  calc(7ch + 1rem)
+// 5    Size "999.9 MB"           8ch  calc(8ch + 1rem)
+// 6    Vote "5"                  2ch  calc(2ch + 1rem)
+// 7    Tkt  "5"                  2ch  calc(2ch + 1rem)
+// 8    Rev  "3"                  2ch  calc(2ch + 1rem)
+// 9    Age  "2h 48m"             6ch  calc(6ch + 1rem)
+$col-min-widths: (
+  1: calc(9ch + 1rem),
+  2: calc(4ch + 1rem),
+  3: calc(7ch + 1rem),
+  4: calc(7ch + 1rem),
+  5: calc(8ch + 1rem),
+  6: calc(2ch + 1rem),
+  7: calc(2ch + 1rem),
+  8: calc(2ch + 1rem),
+  9: calc(6ch + 1rem)
+);
+
+@each $n, $w in $col-min-widths {
+  .last-blocks-table th:nth-child(#{$n}) {
+    min-width: $w;
+  }
+}
+
 // Sticky Height column — base rules must come before expandable overrides
 .sticky-col {
   position: sticky;
   left: 0;
   z-index: 1;
-  background-color: var(--bs-body-bg);
 
   &::after {
     content: "";
@@ -126,11 +156,15 @@ body.darkBG .ska-sub-row--visible {
   background-color: inherit;
 }
 
+// Collapsed parent rows and all default td states — explicit white so the
+// sticky cell is opaque and matches the table background in light mode.
 .last-blocks-table td.sticky-col {
-  background-color: var(--bs-table-bg, #fff);
+  background-color: #fff;
 }
 
-.last-blocks-table td.sticky-col:empty {
+// Sub-rows have a tinted background; the sticky cell must match so it doesn't
+// show the page background through the sticky layer in light mode.
+.last-blocks-table .ska-sub-row--visible td.sticky-col {
   background-color: $card-bg-secondary;
 }
 
@@ -140,10 +174,6 @@ body.darkBG .last-blocks-table th.sticky-col {
 
 body.darkBG .last-blocks-table td.sticky-col {
   background-color: $inverse-bg-white;
-}
-
-body.darkBG .last-blocks-table td.sticky-col:empty {
-  background-color: $card-bg-secondary-dark;
 }
 
 .last-blocks-table-wrap.is-scrolled .sticky-col::after {
@@ -157,17 +187,13 @@ body.darkBG .last-blocks-table-wrap.is-scrolled .sticky-col::after {
 // Expandable block rows — whole row is the click target
 .block-row-expandable {
   cursor: pointer;
-
-  td.token-label-col {
-    vertical-align: middle;
-  }
 }
 
 // Hover and expanded backgrounds — placed after sticky-col base rules to win on specificity
 /* stylelint-disable no-descending-specificity */
 .last-blocks-table .block-row-expandable:hover td,
 .last-blocks-table .block-row-expandable:hover td.sticky-col {
-  background-color: var(--bs-table-hover-bg);
+  background-color: #ececec; // #fff + rgba(0,0,0,0.075) — Bootstrap table-hover-bg blended
 }
 
 .last-blocks-table .block-row-expandable.is-expanded td,
@@ -179,6 +205,15 @@ body.darkBG .last-blocks-table-wrap.is-scrolled .sticky-col::after {
 .last-blocks-table .block-row-expandable.is-expanded:hover td,
 .last-blocks-table .block-row-expandable.is-expanded:hover td.sticky-col {
   background-color: #ededee; // $card-bg-secondary darkened ~3%
+}
+
+body.darkBG .last-blocks-table .block-row-expandable:hover td,
+body.darkBG .last-blocks-table .block-row-expandable:hover td.sticky-col {
+  background-color: #363b40; // $inverse-bg-white + rgba(255,255,255,0.075) — Bootstrap dark hover blended
+}
+
+body.darkBG .last-blocks-table .ska-sub-row--visible td.sticky-col {
+  background-color: $card-bg-secondary-dark;
 }
 
 body.darkBG .last-blocks-table .block-row-expandable.is-expanded td,

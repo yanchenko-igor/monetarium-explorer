@@ -18,9 +18,11 @@ var mockSKATokens = []struct {
 	{"SKA-3", 5, 2_100_000_000, 1_100},
 }
 
-// mockSKAData returns pre-formatted SKA aggregate values and sub-rows.
+// mockSKAData returns a pre-formatted SKA aggregate amount and sub-rows.
 // When height % 9 == 0, it returns an empty sub-row slice to simulate a block
 // with no SKA activity, exercising the accordion-disabled state.
+// txCount and size are returned for potential future use but currently unused
+// by the template.
 func mockSKAData(height int64) (txCount, amount, size string, subRows []SKASubRow) {
 	if height%9 == 0 {
 		return "0", "0", "0", nil

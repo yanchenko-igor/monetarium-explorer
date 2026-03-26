@@ -19,10 +19,9 @@ const { default: BlocklistController } = await import('./blocklist_controller.js
 // Helpers
 // ---------------------------------------------------------------------------
 
-// 10-column layout matching home_latest_blocks.tmpl
+// 9-column layout matching home_latest_blocks.tmpl
 const DATA_TYPES = [
   'height',
-  'token-label',
   'tx',
   'var-amount',
   'ska-amount',
@@ -33,7 +32,7 @@ const DATA_TYPES = [
   'age'
 ]
 
-// Build one server-rendered block row (10 cells) + sub-rows and append to tbody.
+// Build one server-rendered block row (9 cells) + sub-rows and append to tbody.
 // All block rows are expandable (always have VAR sub-row).
 function appendBlock(tbody, height) {
   const hasSKA = height % 9 !== 0
@@ -48,7 +47,6 @@ function appendBlock(tbody, height) {
     const td = document.createElement('td')
     td.dataset.type = dt
     if (dt === 'height') td.className = 'text-start ps-1 sticky-col'
-    if (dt === 'token-label') td.className = 'token-label-col'
     blockRow.appendChild(td)
   }
   tbody.appendChild(blockRow)
@@ -119,15 +117,15 @@ describe('blocklist_controller — Property 8: WebSocket block prepend matches s
       expect(rows[0].dataset.blockId).toBe('1001')
     })
 
-    it('new block row has exactly 10 cells', () => {
+    it('new block row has exactly 9 cells', () => {
       ctrl._processBlock(makeBlock(1001))
       const row = tbody.querySelector(
         'tr[data-block-id="1001"][data-ska-accordion-target="blockRow"]'
       )
-      expect(row.querySelectorAll('td').length).toBe(10)
+      expect(row.querySelectorAll('td').length).toBe(9)
     })
 
-    it('cell data-type order matches the 10-column spec', () => {
+    it('cell data-type order matches the 9-column spec', () => {
       ctrl._processBlock(makeBlock(1001))
       const row = tbody.querySelector(
         'tr[data-block-id="1001"][data-ska-accordion-target="blockRow"]'
@@ -208,13 +206,13 @@ describe('blocklist_controller — Property 8: WebSocket block prepend matches s
       expect(varRow.dataset.blockId).toBe('1001')
     })
 
-    it('has exactly 10 cells', () => {
+    it('has exactly 9 cells', () => {
       const { tbody, ctrl } = buildTable(1000, 1)
       ctrl._processBlock(makeBlock(1001))
       const row = tbody.querySelector(
         'tr[data-block-id="1001"][data-ska-accordion-target="blockRow"]'
       )
-      expect(row.nextElementSibling.querySelectorAll('td').length).toBe(10)
+      expect(row.nextElementSibling.querySelectorAll('td').length).toBe(9)
     })
 
     it('token-label cell contains "VAR"', () => {
@@ -223,7 +221,7 @@ describe('blocklist_controller — Property 8: WebSocket block prepend matches s
       const row = tbody.querySelector(
         'tr[data-block-id="1001"][data-ska-accordion-target="blockRow"]'
       )
-      const labelCell = row.nextElementSibling.querySelector('td.token-label-col')
+      const labelCell = row.nextElementSibling.querySelector('td.sticky-col')
       expect(labelCell).not.toBeNull()
       expect(labelCell.textContent.trim()).toBe('VAR')
     })
@@ -266,8 +264,8 @@ describe('blocklist_controller — Property 8: WebSocket block prepend matches s
         tbody.querySelectorAll('tr[data-block-id="1001"][data-ska-accordion-target="subRow"]')
       ).slice(1) // skip VAR row
       subs.forEach((r) => {
-        expect(r.querySelectorAll('td').length).toBe(10)
-        const label = r.querySelector('td.token-label-col')
+        expect(r.querySelectorAll('td').length).toBe(9)
+        const label = r.querySelector('td.sticky-col')
         expect(label).not.toBeNull()
         expect(label.textContent.trim()).toMatch(/^SKA-\d+$/)
       })
@@ -329,9 +327,9 @@ describe('blocklist_controller — Property 8: WebSocket block prepend matches s
           const newRow = newRows[0]
           expect(tbody.firstElementChild).toBe(newRow)
 
-          // 2. 10 cells in correct order
+          // 2. 9 cells in correct order
           const cells = newRow.querySelectorAll('td')
-          expect(cells.length).toBe(10)
+          expect(cells.length).toBe(9)
           expect(Array.from(cells).map((td) => td.dataset.type)).toEqual(DATA_TYPES)
 
           // 3. All rows are expandable (always have at least a VAR sub-row)
@@ -339,7 +337,7 @@ describe('blocklist_controller — Property 8: WebSocket block prepend matches s
           expect(newRow.classList.contains('block-row-expandable')).toBe(true)
           expect(newRow.dataset.action).toBe('click->ska-accordion#toggle')
 
-          // 4. Sub-rows: correct count, 10 cells, collapsed
+          // 4. Sub-rows: correct count, 9 cells, collapsed
           const subs = tbody.querySelectorAll(
             `tr[data-block-id="${height}"][data-ska-accordion-target="subRow"]`
           )
@@ -348,7 +346,7 @@ describe('blocklist_controller — Property 8: WebSocket block prepend matches s
             expect(r.classList.contains('ska-sub-row')).toBe(true)
             expect(r.dataset.blockId).toBe(String(height))
             expect(r.classList.contains('ska-sub-row--visible')).toBe(false)
-            expect(r.querySelectorAll('td').length).toBe(10)
+            expect(r.querySelectorAll('td').length).toBe(9)
           })
 
           // 5. New block group is contiguous before the next block row
