@@ -104,22 +104,22 @@ body.darkBG .ska-sub-row--visible {
 // Column minimum widths — single source of truth.
 // Sized to the widest expected content so expanding sub-rows never shift columns.
 // Formula: max-content-chars × 1ch + Bootstrap cell padding (0.5rem/side = 1rem total).
-// Col  Max content             chars  min-width
-// 1    "1,878,074" / "SKA-255"   9ch  calc(9ch + 1rem)
-// 2    Txn "9999"                4ch  calc(4ch + 1rem)
-// 3    VAR "100.00B"             7ch  calc(7ch + 1rem)
-// 4    SKA "100.00B"             7ch  calc(7ch + 1rem)
-// 5    Size "999.9 MB"           8ch  calc(8ch + 1rem)
-// 6    Vote "5"                  2ch  calc(2ch + 1rem)
-// 7    Tkt  "5"                  2ch  calc(2ch + 1rem)
-// 8    Rev  "3"                  2ch  calc(2ch + 1rem)
-// 9    Age  "2h 48m"             6ch  calc(6ch + 1rem)
+// Col  Max content
+// 1    "1,878,074" / "SKA-255"
+// 2    Txn "9999"
+// 3    VAR "100.00B"
+// 4    SKA "100.00B"
+// 5    Size "999.9 MB"
+// 6    Vote "5"
+// 7    Tkt  "5"
+// 8    Rev  "3"
+// 9    Age  "22m 48s"
 $col-min-widths: (
-  1: calc(9ch + 1rem),
-  2: calc(4ch + 1rem),
-  3: calc(7ch + 1rem),
-  4: calc(7ch + 1rem),
-  5: calc(8ch + 1rem),
+  1: calc(7ch + 1rem),
+  2: calc(2ch + 1rem),
+  3: calc(5ch + 1rem),
+  4: calc(5ch + 1rem),
+  5: calc(6ch + 1rem),
   6: calc(2ch + 1rem),
   7: calc(2ch + 1rem),
   8: calc(2ch + 1rem),
