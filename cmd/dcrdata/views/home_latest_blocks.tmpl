@@ -1,17 +1,16 @@
 {{define "home_latest_blocks"}}
-<div class="table-responsive last-blocks-table-wrap">
   <table class="table w-100 mt-2 mx-auto mb-0 last-blocks-table">
     <thead>
       <tr>
-        <th class="text-start ps-2" title="block height">Height</th>
-        <th class="text-end" title="number of transactions">Txn</th>
-        <th class="text-end" title="total VAR amount">VAR</th>
-        <th class="text-end" title="total SKA amount">SKA</th>
-        <th class="text-end d-none d-sm-table-cell d-md-none d-lg-table-cell" title="total block size">Size</th>
-        <th class="text-end" title="tickets voted">Vote</th>
-        <th class="text-end" title="tickets purchased">Tkt</th>
-        <th class="text-end d-none d-sm-table-cell d-md-none d-lg-table-cell" title="tickets revoked">Rev</th>
-        <th class="text-end" data-time-target="header" data-jstitle="Age" title="block age">Age</th>
+        <th class="text-start ps-2 position-relative" data-tooltip="block height">Height</th>
+        <th class="text-end position-relative" data-tooltip="number of transactions">Txn</th>
+        <th class="text-end position-relative" data-tooltip="total VAR amount">VAR</th>
+        <th class="text-end position-relative" data-tooltip="total SKA amount">SKA</th>
+        <th class="text-end d-none d-sm-table-cell d-md-none d-lg-table-cell position-relative" data-tooltip="total block size">Size</th>
+        <th class="text-end position-relative" data-tooltip="tickets voted">Vote</th>
+        <th class="text-end position-relative" data-tooltip="tickets purchased">Tkt</th>
+        <th class="text-end d-none d-sm-table-cell d-md-none d-lg-table-cell position-relative" data-tooltip="tickets revoked">Rev</th>
+        <th class="text-end position-relative" data-time-target="header" data-jstitle="Age" data-tooltip="block age">Age</th>
       </tr>
     </thead>
     <tbody data-controller="ska-accordion" data-blocklist-target="table">
@@ -66,5 +65,4 @@
       {{end}}
     </tbody>
   </table>
-</div>
 {{end}}
