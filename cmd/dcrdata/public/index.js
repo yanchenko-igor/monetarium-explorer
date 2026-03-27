@@ -1,8 +1,7 @@
 // import 'core-js/stable';
-import 'regenerator-runtime/runtime'
-/* global require */
 import { Application } from '@hotwired/stimulus'
 import { definitionsFromContext } from '@hotwired/stimulus-webpack-helpers'
+import 'regenerator-runtime/runtime'
 import globalEventBus from './js/services/event_bus_service'
 import ws from './js/services/messagesocket_service'
 import { darkEnabled } from './js/services/theme_service'
@@ -15,7 +14,7 @@ const application = Application.start()
 const context = require.context('./js/controllers', true, /(?<!\.test)\.js$/)
 application.load(definitionsFromContext(context))
 
-document.addEventListener('turbolinks:load', function (e) {
+document.addEventListener('turbolinks:load', (_e) => {
   document.querySelectorAll('.jsonly').forEach((el) => {
     el.classList.remove('jsonly')
   })
@@ -34,7 +33,7 @@ export function notifyNewBlock(newBlock) {
 
 function getSocketURI(loc) {
   const protocol = loc.protocol === 'https:' ? 'wss' : 'ws'
-  return protocol + '://' + loc.host + '/ws'
+  return `${protocol}://${loc.host}/ws`
 }
 
 function sleep(ms) {
@@ -67,7 +66,7 @@ window.loggingDebug = window.localStorage.getItem('loggingDebug') === '1'
 window.logDebug = (yes) => {
   window.loggingDebug = yes
   window.localStorage.setItem('loggingDebug', yes ? '1' : '0')
-  return 'debug logging set to ' + (yes ? 'true' : 'false')
+  return `debug logging set to ${yes ? 'true' : 'false'}`
 }
 
 createWebSocket(window.location)

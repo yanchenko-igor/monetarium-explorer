@@ -1,8 +1,8 @@
 import { Controller } from '@hotwired/stimulus'
 import { barChartPlotter } from '../helpers/chart_helper'
-import { getDefault } from '../helpers/module_helper'
-import humanize from '../helpers/humanize_helper'
 import { requestJSON } from '../helpers/http'
+import humanize from '../helpers/humanize_helper'
+import { getDefault } from '../helpers/module_helper'
 
 const chartLayout = {
   showRangeSelector: true,
@@ -20,16 +20,16 @@ function agendasLegendFormatter(data) {
   if (data.x == null) return ''
   let html
   if (this.getLabels()[0] === 'Date') {
-    html = this.getLabels()[0] + ': ' + humanize.date(data.x)
+    html = `${this.getLabels()[0]}: ${humanize.date(data.x)}`
   } else {
-    html = this.getLabels()[0] + ': ' + data.xHTML
+    html = `${this.getLabels()[0]}: ${data.xHTML}`
   }
   const total = data.series.reduce((total, n) => {
     return total + n.y
   }, 0)
   data.series.forEach((series) => {
     const percentage = total !== 0 ? ((series.y * 100) / total).toFixed(2) : 0
-    html = '<span style="color:#2d2d2d;">' + html + '</span>'
+    html = `<span style="color:#2d2d2d;">${html}</span>`
     html += `<br>${series.dashHTML}<span style="color: ${series.color};">${series.labelHTML}: ${series.yHTML} (${percentage}%)</span>`
   })
   return html
@@ -67,7 +67,7 @@ export default class extends Controller {
       import(/* webpackChunkName: "dygraphs" */ '../vendor/dygraphs.min.js')
     )
     this.drawCharts()
-    const agendaResponse = await requestJSON('/api/agenda/' + this.agendaId)
+    const agendaResponse = await requestJSON(`/api/agenda/${this.agendaId}`)
     this.cumulativeVoteChoicesChart.updateOptions({
       file: cumulativeVoteChoicesData(agendaResponse.by_time)
     })
@@ -98,7 +98,7 @@ export default class extends Controller {
     })
   }
 
-  drawChart(el, options, Dygraph) {
+  drawChart(el, options, _Dygraph) {
     return new this.Dygraph(el, this.emptydata, {
       ...chartLayout,
       ...options

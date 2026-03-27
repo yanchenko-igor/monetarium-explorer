@@ -1,8 +1,8 @@
 import { Controller } from '@hotwired/stimulus'
-import TurboQuery from '../helpers/turbolinks_helper'
-import { getDefault } from '../helpers/module_helper'
-import globalEventBus from '../services/event_bus_service'
 import dompurify from 'dompurify'
+import { getDefault } from '../helpers/module_helper'
+import TurboQuery from '../helpers/turbolinks_helper'
+import globalEventBus from '../services/event_bus_service'
 
 function digitformat(amount, decimalPlaces, noComma) {
   if (!amount) return 0
@@ -219,19 +219,23 @@ export default class extends Controller {
       attack_type: externalAttackType
     }
 
-    if (this.settings.attack_time)
+    if (this.settings.attack_time) {
       this.attackPeriodTarget.value = parseInt(this.settings.attack_time)
+    }
     if (this.settings.target_pow) this.targetPowTarget.value = parseFloat(this.settings.target_pow)
     if (this.settings.kwh_rate) this.kwhRateTarget.value = parseFloat(this.settings.kwh_rate)
-    if (this.settings.other_costs)
+    if (this.settings.other_costs) {
       this.otherCostsTarget.value = parseFloat(this.settings.other_costs)
-    if (this.settings.target_pos)
+    }
+    if (this.settings.target_pos) {
       this.setAllInputs(this.targetPosTargets, parseFloat(this.settings.target_pos))
+    }
     if (this.settings.price) this.priceDCRTarget.value = parseFloat(this.settings.price)
     if (this.settings.device) this.setDevice(this.settings.device)
     if (this.settings.attack_type) this.attackTypeTarget.value = this.settings.attack_type
-    if (this.settings.target_pos)
+    if (this.settings.target_pos) {
       this.attackPercentTarget.value = parseFloat(this.targetPosTarget.value) / 100
+    }
 
     if (this.settings.attack_type !== internalAttackType) {
       this.settings.attack_type = externalAttackType
@@ -245,7 +249,7 @@ export default class extends Controller {
 
     // dygraph does not provide a way to disable zoom on y-axis https://code.google.com/archive/p/dygraphs/issues/384
     // this is a hack as doZoomY_ is marked as private
-    Dygraph.prototype.doZoomY_ = function (lowY, highY) {}
+    Dygraph.prototype.doZoomY_ = function (_lowY, _highY) {}
 
     this.plotGraph()
     this.processNightMode = (params) => {
@@ -295,7 +299,7 @@ export default class extends Controller {
       legend: 'always',
       logscale: true,
       interactionModel: {
-        click: function (e) {
+        click: function (_e) {
           that.attackPercentTarget.value = currentPoint.x
           that.updateSliderData()
         }
@@ -331,9 +335,9 @@ export default class extends Controller {
     this.updateSliderData()
   }
 
-  updateTargetPow(e) {
+  updateTargetPow(_e) {
     this.preserveTargetPow = true
-    const targetPercentage = parseFloat(e.currentTarget.value) / 100
+    const targetPercentage = parseFloat(_e.currentTarget.value) / 100
     let target = this.ratioTable.get(targetPercentage)
     if (target === undefined) {
       let previousKey = 0
@@ -404,14 +408,14 @@ export default class extends Controller {
 
   selectOption(options) {
     let val = '0'
-    options.map((n) => {
+    options.forEach((n) => {
       if (n.selected) val = n.value
     })
     return val
   }
 
   setDevicesDesc() {
-    this.deviceDescTargets.map((n) => {
+    this.deviceDescTargets.forEach((n) => {
       const info = deviceList[n.value]
       if (!info) return
       n.innerHTML = `${info.name} (${info.hashrate} ${info.units}, ${info.power} W, $${digitformat(info.cost)} ea.)`
@@ -423,7 +427,7 @@ export default class extends Controller {
   }
 
   setOption(options, selectedVal) {
-    options.map((n) => {
+    options.forEach((n) => {
       n.selected = n.value === selectedVal
     })
   }
@@ -446,7 +450,7 @@ export default class extends Controller {
     } else {
       this.preserveTargetPow = false
     }
-    this.setAllValues(this.internalHashTargets, digitformat(this.targetHashRate, 4) + ' Ph/s ')
+    this.setAllValues(this.internalHashTargets, `${digitformat(this.targetHashRate, 4)} Ph/s `)
     switch (this.settings.attack_type) {
       case externalAttackType:
         this.setAllValues(this.newHashRateTargets, digitformat(this.targetHashRate + hashrate, 4))
@@ -481,7 +485,7 @@ export default class extends Controller {
     this.updateTargetHashRate()
     this.setActivePoint()
 
-    this.ticketsTarget.innerHTML = digitformat(val * tpSize) + ' tickets '
+    this.ticketsTarget.innerHTML = `${digitformat(val * tpSize)} tickets `
     switch (this.settings.attack_type) {
       case externalAttackType:
         this.hideAll(this.internalAttackPosTextTargets)
@@ -535,7 +539,7 @@ export default class extends Controller {
     const totalPos = totalDCRPos * dcrPrice
     const timeStr = this.attackPeriodTarget.value
     const hourStr = timeStr > 1 ? 'hours' : 'hour'
-    const timeHourStr = timeStr + ' ' + hourStr
+    const timeHourStr = `${timeStr} ${hourStr}`
     const devicePronounStr = deviceCount > 1 ? 'them' : 'it'
     const deviceSuffixStr = deviceCount > 1 ? 's' : ''
     this.ticketPoolSizeLabelTarget.innerHTML = digitformat(tpSize, 2)

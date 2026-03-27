@@ -119,7 +119,7 @@ export default class extends Controller {
       Regular: this.regularTransactionsTarget
     }
     if (this.hasTaddTransactionsTarget)
-      this.txTargetMap['Treasury Add'] = this.taddTransactionsTarget
+      {this.txTargetMap['Treasury Add'] = this.taddTransactionsTarget}
     this.countTargetMap = {
       Vote: this.numVoteTarget,
       Ticket: this.numTicketTarget,
@@ -200,7 +200,7 @@ export default class extends Controller {
     buildTable(this.ticketTransactionsTarget, 'tickets', m.tickets, txTableRow)
     buildTable(this.tspendTransactionsTarget, 'tspends', m.tspends, treasuryTxTableRow)
     if (this.hasTaddTransactionsTarget)
-      buildTable(this.taddTransactionsTarget, 'tadds', m.tadds, treasuryTxTableRow)
+      {buildTable(this.taddTransactionsTarget, 'tadds', m.tadds, treasuryTxTableRow)}
   }
 
   renderNewTxns(txs) {
@@ -253,7 +253,7 @@ export default class extends Controller {
 
   sortVotesTable() {
     const rows = Array.from(this.voteTransactionsTarget.querySelectorAll('tr'))
-    rows.sort(function (a, b) {
+    rows.sort((a, b) => {
       if (a.dataset.height === b.dataset.height) {
         const indexA = parseInt(a.dataset.ticketIndex)
         const indexB = parseInt(b.dataset.ticketIndex)

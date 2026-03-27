@@ -66,7 +66,7 @@ export default class TurboQuery {
 
   filteredQuery(query) {
     const filtered = {}
-    Object.keys(query).forEach(function (key) {
+    Object.keys(query).forEach((key) => {
       const v = query[key]
       if (typeof v === 'undefined' || v === null) return
       filtered[key] = v

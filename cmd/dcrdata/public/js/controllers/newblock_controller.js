@@ -8,13 +8,13 @@ export default class extends Controller {
 
   initialize() {
     const that = this
-    globalEventBus.on('BLOCK_RECEIVED', function (data) {
+    globalEventBus.on('BLOCK_RECEIVED', (data) => {
       that.refreshConfirmations(data.block.height)
     })
   }
 
   connect() {
-    this.confirmationsTargets.forEach((el, i) => {
+    this.confirmationsTargets.forEach((el, _i) => {
       if (!el.dataset.confirmations) return
       this.setConfirmationText(el, el.dataset.confirmations)
     })
@@ -33,7 +33,7 @@ export default class extends Controller {
   }
 
   refreshConfirmations(expHeight) {
-    this.confirmationsTargets.forEach((el, i) => {
+    this.confirmationsTargets.forEach((el, _i) => {
       const confirmHeight = parseInt(el.dataset.confirmationBlockHeight)
       if (confirmHeight === -1) return // Unconfirmed block
       const confirmations = expHeight - confirmHeight + 1

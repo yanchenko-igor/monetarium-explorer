@@ -1,20 +1,19 @@
 import { Controller } from '@hotwired/stimulus'
-import ws from '../services/messagesocket_service'
-import { barChartPlotter } from '../helpers/chart_helper'
-import { getDefault } from '../helpers/module_helper'
 import dompurify from 'dompurify'
+import { barChartPlotter } from '../helpers/chart_helper'
 import { requestJSON } from '../helpers/http'
+import { getDefault } from '../helpers/module_helper'
+import ws from '../services/messagesocket_service'
 
 let Dygraph // lazy loaded on connect
 
 // Common code for ploting dygraphs
 function legendFormatter(data) {
   if (data.x == null) return ''
-  let html = this.getLabels()[0] + ': ' + data.xHTML
-  data.series.map((series) => {
-    const labeledData =
-      ' <span style="color: ' + series.color + ';">' + series.labelHTML + ': ' + series.yHTML
-    html += '<br>' + series.dashHTML + labeledData + '</span>'
+  let html = `${this.getLabels()[0]}: ${data.xHTML}`
+  data.series.forEach((series) => {
+    const labeledData = ` <span style="color: ${series.color};">${series.labelHTML}: ${series.yHTML}`
+    html += `<br>${series.dashHTML}${labeledData}</span>`
   })
   dompurify.sanitize(html, { FORBID_TAGS: ['svg', 'math'] })
   return html
@@ -34,7 +33,7 @@ function purchasesGraphData(items, memP) {
   const s = []
   let finalDate = ''
 
-  items.time.map((n, i) => {
+  items.time.forEach((n, i) => {
     finalDate = new Date(n)
     s.push([finalDate, 0, items.immature[i], items.live[i], items.price[i]])
   })
@@ -60,7 +59,7 @@ function priceGraphData(items, memP) {
     mCount = memP.count
   }
 
-  items.price.map((n, i) => {
+  items.price.forEach((n, i) => {
     if (n === mPrice) {
       mempl = mCount
       p.push([n, mempl, items.immature[i], items.live[i]])
@@ -85,7 +84,7 @@ function populateOutputs(data) {
   )
   let tableData =
     '<tr><th style="width: 30%;"># of sstxcommitment outputs</th><th>Count</th><th>% Occurrence</th></tr>'
-  data.outputs.map((n, i) => {
+  data.outputs.forEach((n, i) => {
     const count = parseInt(data.count[i])
     tableData += `<tr><td class="pe-2 lh1rem vam nowrap xs-w117 fw-bold">${parseInt(n)}</td>
     <td><span class="hash lh1rem">${count}</span></td>
@@ -192,8 +191,9 @@ export default class extends Controller {
       }
     }
     if (data.outputs_chart) {
-      while (this.outputsTarget.firstChild)
+      while (this.outputsTarget.firstChild) {
         this.outputsTarget.removeChild(this.outputsTarget.firstChild)
+      }
       this.outputsTarget.appendChild(populateOutputs(data.outputs_chart))
     }
   }
@@ -224,7 +224,7 @@ export default class extends Controller {
     this.bars = e.target.name
     target.classList.add('btn-active')
     this.wrapperTarget.classList.add('loading')
-    const url = '/api/ticketpool/bydate/' + this.bars
+    const url = `/api/ticketpool/bydate/${this.bars}`
     const ticketPoolResponse = await requestJSON(url)
     this.purchasesGraph.updateOptions({
       file: purchasesGraphData(ticketPoolResponse.time_chart)

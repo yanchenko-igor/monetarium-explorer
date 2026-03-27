@@ -1,8 +1,8 @@
 /* global Turbolinks */
 import { Controller } from '@hotwired/stimulus'
 import dompurify from 'dompurify'
-import ws from '../services/messagesocket_service'
 import globalEventBus from '../services/event_bus_service'
+import ws from '../services/messagesocket_service'
 
 function buildProgressBar(data) {
   const clean = dompurify.sanitize
@@ -22,7 +22,7 @@ function buildProgressBar(data) {
 
   let remainingStr = 'pending'
   if (progressVal > 0) {
-    remainingStr = data.seconds_to_complete > 0 ? 'remaining approx.  ' + timeRemaining : '0sec'
+    remainingStr = data.seconds_to_complete > 0 ? `remaining approx.  ${timeRemaining}` : '0sec'
   }
 
   if (progressVal === 100) {
@@ -37,14 +37,10 @@ function buildProgressBar(data) {
     htmlString +
     clean(
       `<div class="progress" style="height:30px;border-radius:5px;">
-                <div class="progress-bar sync-progress-bar" role="progressbar" style="height:auto; width:` +
-        progressVal +
-        `%;">
-                <span class="nowrap ps-1 fw-bold">Progress ` +
-        progressVal +
-        '% (' +
-        remainingStr +
-        `)</span>
+                <div class="progress-bar sync-progress-bar" role="progressbar" style="height:auto; width:${
+                  progressVal
+                }%;">
+                <span class="nowrap ps-1 fw-bold">Progress ${progressVal}% (${remainingStr})</span>
                 </div>
             </div>`,
       { FORBID_TAGS: ['svg', 'math'] }
@@ -64,7 +60,7 @@ function humanizeTime(secs) {
   const timeUnit = ['yr', 'mo', 'wk', 'd', 'hr', 'min', 'sec']
 
   return [years, months, weeks, days, hours, minutes, seconds]
-    .map((v, i) => (v !== 0 ? v + '' + timeUnit[i] : ''))
+    .map((v, i) => (v !== 0 ? `${v}${timeUnit[i]}` : ''))
     .join('  ')
 }
 
@@ -117,7 +113,7 @@ export default class extends Controller {
     globalEventBus.off('BLOCK_RECEIVED', this.processBlock)
   }
 
-  _processBlock(blockData) {
+  _processBlock(_blockData) {
     if (this.hasFutureBlockTarget) {
       Turbolinks.visit(window.location, { action: 'replace' })
     }

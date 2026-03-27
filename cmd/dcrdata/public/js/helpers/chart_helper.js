@@ -35,7 +35,7 @@ function plotChart(e, barWidth) {
   ctx.fillStyle = e.color
   ctx.lineWidth = findLineWidth(barWidth)
 
-  e.points.map((p) => {
+  e.points.forEach((p) => {
     if (p.yval === 0) return
     const x = p.canvasx - barWidth / 2
     const height = yBottom - p.canvasy
@@ -53,7 +53,7 @@ export function multiColumnBarPlotter(e) {
   const yBottom = e.dygraph.toDomYCoord(0)
 
   let minSep = Infinity
-  sets.map((bar) => {
+  sets.forEach((bar) => {
     minSep = findMinSep(bar, minSep)
   })
   const barWidth = findWidth(minSep)
@@ -61,11 +61,11 @@ export function multiColumnBarPlotter(e) {
   const fillColors = g.getOption('fillColors')
   ctx.lineWidth = findLineWidth(barWidth)
 
-  sets.map((bar, i) => {
+  sets.forEach((bar, i) => {
     ctx.fillStyle = fillColors[i]
     ctx.strokeStyle = strokeColors[i]
 
-    bar.map((p) => {
+    bar.forEach((p) => {
       if (p.yval === 0) return
       const xLeft = p.canvasx - (barWidth / 2) * (1 - i / (sets.length - 1))
       const height = yBottom - p.canvasy
@@ -118,7 +118,7 @@ function minViewValueRange(chartIndex) {
 
 function attachZoomHandlers(gs, prevCallbacks) {
   let block = false
-  gs.map((g) => {
+  gs.forEach((g) => {
     g.updateOptions(
       {
         drawCallback: function (me, initial) {
@@ -126,7 +126,7 @@ function attachZoomHandlers(gs, prevCallbacks) {
           block = true
           const opts = { dateWindow: me.xAxisRange() }
 
-          gs.map((gCopy, j) => {
+          gs.forEach((gCopy, j) => {
             if (gCopy === me) {
               if (prevCallbacks[j] && prevCallbacks[j].drawCallback) {
                 prevCallbacks[j].drawCallback.apply(this, arguments)
@@ -162,14 +162,14 @@ function attachZoomHandlers(gs, prevCallbacks) {
 
 function attachSelectionHandlers(gs, prevCallbacks) {
   let block = false
-  gs.map((g) => {
+  gs.forEach((g) => {
     g.updateOptions(
       {
         highlightCallback: function (event, x, points, row, seriesName) {
           if (block) return
           block = true
           const me = this
-          gs.map((gCopy, i) => {
+          gs.forEach((gCopy, i) => {
             if (me === gCopy) {
               if (prevCallbacks[i] && prevCallbacks[i].highlightCallback) {
                 prevCallbacks[i].highlightCallback.apply(this, arguments)
@@ -183,11 +183,11 @@ function attachSelectionHandlers(gs, prevCallbacks) {
           })
           block = false
         },
-        unhighlightCallback: function (event) {
+        unhighlightCallback: function (_event) {
           if (block) return
           block = true
           const me = this
-          gs.map((gCopy, i) => {
+          gs.forEach((gCopy, i) => {
             if (me === gCopy) {
               if (prevCallbacks[i] && prevCallbacks[i].unhighlightCallback) {
                 prevCallbacks[i].unhighlightCallback.apply(this, arguments)
@@ -207,7 +207,7 @@ function attachSelectionHandlers(gs, prevCallbacks) {
 export function synchronize(dygraphs, syncOptions) {
   const prevCallbacks = []
 
-  dygraphs.map((g, index) => {
+  dygraphs.forEach((g, index) => {
     g.ready(() => {
       const callBackTypes = ['drawCallback', 'highlightCallback', 'unhighlightCallback']
       for (let j = 0; j < dygraphs.length; j++) {

@@ -1,7 +1,7 @@
-const { merge } = require('webpack-merge');
-const common = require('./webpack.common.js');
-const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
-const ESLintPlugin = require('eslint-webpack-plugin');
+const { merge } = require('webpack-merge')
+const common = require('./webpack.common.cjs')
+const CssMinimizerPlugin = require('css-minimizer-webpack-plugin')
+const ESLintPlugin = require('eslint-webpack-plugin')
 
 module.exports = merge(common, {
   mode: 'production',
@@ -9,8 +9,8 @@ module.exports = merge(common, {
   plugins: [
     new ESLintPlugin({
       formatter: 'stylish',
-      threads: true,
-    }),
+      threads: true
+    })
   ],
 
   optimization: {
@@ -18,8 +18,8 @@ module.exports = merge(common, {
     minimize: true,
     minimizer: [
       `...`, // extend webpack 5's TerserPlugin
-      new CssMinimizerPlugin({}),
-    ],
+      new CssMinimizerPlugin({})
+    ]
   },
 
   module: {
@@ -28,7 +28,7 @@ module.exports = merge(common, {
         test: /\.js$/,
         exclude: [
           /node_modules/,
-          /\.test\.js$/, // 👈 exclude test files
+          /\.test\.js$/ // 👈 exclude test files
         ],
         use: {
           loader: 'babel-loader',
@@ -36,12 +36,12 @@ module.exports = merge(common, {
             presets: [
               '@babel/preset-env',
               {
-                exclude: ['@babel/plugin-transform-regenerator'],
-              },
-            ],
-          },
-        },
-      },
-    ],
-  },
-});
+                exclude: ['@babel/plugin-transform-regenerator']
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+})

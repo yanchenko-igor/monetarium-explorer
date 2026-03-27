@@ -29,7 +29,6 @@
 }
 
 .dygraph-axis-label {
-  z-index: 0 !important;
   z-index: 10;
   line-height: normal;
   overflow: hidden;
@@ -243,7 +242,7 @@
   }
 }
 
-@media (min-width: 992px) {
+@media (width >= 992px) {
   .market-chart {
     .dygraph-ylabel,
     .dygraph-xlabel {

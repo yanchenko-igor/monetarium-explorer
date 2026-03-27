@@ -1,15 +1,15 @@
 import { Controller } from '@hotwired/stimulus'
-import { map, assign, merge } from 'lodash-es'
-import Zoom from '../helpers/zoom_helper'
-import { darkEnabled } from '../services/theme_service'
+import dompurify from 'dompurify'
+import { assign, map, merge } from 'lodash-es'
 import { animationFrame } from '../helpers/animation_helper'
+import { isEqual } from '../helpers/chart_helper'
+import { requestJSON } from '../helpers/http'
+import humanize from '../helpers/humanize_helper'
 import { getDefault } from '../helpers/module_helper'
 import TurboQuery from '../helpers/turbolinks_helper'
+import Zoom from '../helpers/zoom_helper'
 import globalEventBus from '../services/event_bus_service'
-import { isEqual } from '../helpers/chart_helper'
-import dompurify from 'dompurify'
-import humanize from '../helpers/humanize_helper'
-import { requestJSON } from '../helpers/http'
+import { darkEnabled } from '../services/theme_service'
 
 let selectedChart
 let Dygraph // lazy loaded on connect
@@ -63,8 +63,9 @@ function axesToRestoreYRange(chartName, origYRange, newYRange) {
     !Array.isArray(newYRange) ||
     origYRange.length !== newYRange.length ||
     !axesIndexes
-  )
+  ) {
     return
+  }
 
   let axes
   for (let i = 0; i < axesIndexes.length; i++) {
@@ -84,12 +85,13 @@ function axesToRestoreYRange(chartName, origYRange, newYRange) {
 
 function withBigUnits(v, units) {
   const i = v === 0 ? 0 : Math.floor(Math.log10(v) / 3)
-  return (v / Math.pow(1000, i)).toFixed(3) + ' ' + units[i]
+  return `${(v / Math.pow(1000, i)).toFixed(3)} ${units[i]}`
 }
 
 function blockReward(height) {
-  if (height >= stakeValHeight)
+  if (height >= stakeValHeight) {
     return baseSubsidy * Math.pow(subsidyExponent, Math.floor(height / subsidyInterval))
+  }
   if (height > 1) return baseSubsidy * (1 - stakeShare)
   if (height === 1) return premine
   return 0
@@ -524,7 +526,7 @@ export default class extends Controller {
           valueRange: [0, windowSize * 20 * 8],
           axisLabelFormatter: (y) => Math.round(y)
         }
-        yFormatter = customYFormatter((y) => y.toFixed(8) + ' DCR')
+        yFormatter = customYFormatter((y) => `${y.toFixed(8)} DCR`)
         break
 
       case 'ticket-pool-size': // pool size graph
@@ -568,7 +570,7 @@ export default class extends Controller {
           )
         )
         yFormatter = (div, data, i) => {
-          addLegendEntryFmt(div, data.series[0], (y) => y.toFixed(4) + '%')
+          addLegendEntryFmt(div, data.series[0], (y) => `${y.toFixed(4)}%`)
           div.appendChild(
             legendEntry(`${legendMarker()} Ticket Pool Value: ${intComma(rawPoolValue[i])} DCR`)
           )
@@ -591,7 +593,7 @@ export default class extends Controller {
             false
           )
         )
-        yFormatter = customYFormatter((y) => intComma(y) + ' DCR')
+        yFormatter = customYFormatter((y) => `${intComma(y)} DCR`)
         break
 
       case 'block-size': // block size graph
@@ -663,7 +665,7 @@ export default class extends Controller {
         }
         gOptions.inflation = d.inflation
         yFormatter = (div, data, i) => {
-          addLegendEntryFmt(div, data.series[0], (y) => intComma(y) + ' DCR')
+          addLegendEntryFmt(div, data.series[0], (y) => `${intComma(y)} DCR`)
           let change = 0
           if (i < d.inflation.length) {
             const supply = data.series[0].y
@@ -702,8 +704,8 @@ export default class extends Controller {
           mapDygraphOptions(d.data, [xlabel, label], false, `${label} (DCR)`, true, false)
         )
 
-        yFormatter = (div, data, i) => {
-          addLegendEntryFmt(div, data.series[0], (y) => (y > 0 ? intComma(y) : '0' + ' DCR'))
+        yFormatter = (div, data, _i) => {
+          addLegendEntryFmt(div, data.series[0], (y) => (y > 0 ? intComma(y) : '0 DCR'))
         }
         break
       }
@@ -805,7 +807,7 @@ export default class extends Controller {
       this.settings.bin !== this.selectedBin() ||
       this.settings.axis !== this.selectedAxis()
     ) {
-      let url = '/api/chart/' + selection
+      let url = `/api/chart/${selection}`
       if (usesWindowUnits(selection) && !usesHybridUnits(selection)) {
         this.binSelectorTarget.classList.add('d-hide')
         this.settings.bin = 'window'

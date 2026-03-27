@@ -1,5 +1,5 @@
 {
-  "extends": ["stylelint-config-standard-scss", "stylelint-config-prettier-scss"],
+  "extends": ["stylelint-config-standard-scss"],
   "rules": {
     "selector-class-pattern": null,
     "selector-attribute-quotes": null,
@@ -8,7 +8,6 @@
     "at-rule-no-vendor-prefix": null,
     "value-keyword-case": null,
     "font-family-name-quotes": "always-unless-keyword",
-    "string-quotes": "double",
-    "declaration-colon-newline-after": null
+    "declaration-block-no-redundant-longhand-properties": null
   }
 }

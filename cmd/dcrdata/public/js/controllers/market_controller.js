@@ -144,7 +144,7 @@ let settings = {}
 const commonChartOpts = {
   gridLineColor: gridColor,
   axisLineColor: 'transparent',
-  underlayCallback: (ctx, area, dygraph) => {
+  underlayCallback: (ctx, area, _dygraph) => {
     ctx.lineWidth = 1
     ctx.strokeStyle = gridColor
     ctx.strokeRect(area.x, area.y, area.w, area.h)
@@ -181,7 +181,7 @@ function adjustAxis(axis, zoomInPercentage, bias) {
   return [axis[0] + foo[0], axis[1] - foo[1]]
 }
 
-function gScroll(event, g, context) {
+function gScroll(event, g, _context) {
   const percentage = event.detail
     ? (event.detail * -1) / 1000
     : event.wheelDelta
@@ -716,7 +716,7 @@ export default class extends Controller {
   }
 
   xcTokenAndPair() {
-    return settings.xc + ':' + settings.pair
+    return `${settings.xc}:${settings.pair}`
   }
 
   processCandlesticks(response) {

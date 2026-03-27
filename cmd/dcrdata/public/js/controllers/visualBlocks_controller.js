@@ -213,7 +213,7 @@ export default class extends Controller {
       this.handleMempoolUpdate(event)
     })
 
-    ws.registerEvtHandler('mempool', (event) => {
+    ws.registerEvtHandler('mempool', (_event) => {
       ws.send('getmempooltrimmed', '')
     })
 
@@ -340,24 +340,29 @@ export default class extends Controller {
         }
 
         tooltipElement.title = newContent
-      } catch (error) {}
+      } catch {
+        // title is not valid JSON, skip tooltip setup for this element
+      }
     })
 
-    import(/* webpackChunkName: "tippy" */ '../vendor/tippy.all').then((module) => {
-      const tippy = module.default
-      tippy('.block-rows [title]', {
-        allowTitleHTML: true,
-        animation: 'shift-away',
-        arrow: true,
-        createPopperInstanceOnInit: true,
-        dynamicTitle: true,
-        performance: true,
-        placement: 'top',
-        size: 'small',
-        sticky: true,
-        theme: 'light'
+    import(/* webpackChunkName: "tippy" */ '../vendor/tippy.all')
+      .then((module) => {
+        const tippy = module.default
+        tippy('.block-rows [title]', {
+          allowTitleHTML: true,
+          animation: 'shift-away',
+          arrow: true,
+          createPopperInstanceOnInit: true,
+          dynamicTitle: true,
+          performance: true,
+          placement: 'top',
+          size: 'small',
+          sticky: true,
+          theme: 'light'
+        })
+        return null
       })
-    })
+      .catch((err) => console.error('tippy load error:', err))
   }
 
   visibleBlocks() {

@@ -2,7 +2,7 @@
 
 export function animationFrame() {
   let _resolve = null
-  const promise = new Promise(function (resolve) {
+  const promise = new Promise((resolve) => {
     _resolve = resolve
   })
   window.requestAnimationFrame(_resolve)

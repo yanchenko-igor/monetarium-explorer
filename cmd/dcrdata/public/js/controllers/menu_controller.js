@@ -35,7 +35,7 @@ export default class extends Controller {
     }
   }
 
-  toggle(e) {
+  toggle(_e) {
     if (this.toggleTarget.checked) {
       document.addEventListener('click', this.clickout)
     }

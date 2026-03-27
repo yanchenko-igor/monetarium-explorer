@@ -1,15 +1,15 @@
 import { Controller } from '@hotwired/stimulus'
-import { isEmpty } from 'lodash-es'
 import dompurify from 'dompurify'
-import { getDefault } from '../helpers/module_helper'
+import { isEmpty } from 'lodash-es'
+import { animationFrame, fadeIn } from '../helpers/animation_helper'
+import txInBlock from '../helpers/block_helper'
 import { padPoints, sizedBarPlotter } from '../helpers/chart_helper'
+import { requestJSON } from '../helpers/http'
+import humanize from '../helpers/humanize_helper'
+import { getDefault } from '../helpers/module_helper'
+import TurboQuery from '../helpers/turbolinks_helper'
 import Zoom from '../helpers/zoom_helper'
 import globalEventBus from '../services/event_bus_service'
-import TurboQuery from '../helpers/turbolinks_helper'
-import humanize from '../helpers/humanize_helper'
-import txInBlock from '../helpers/block_helper'
-import { fadeIn, animationFrame } from '../helpers/animation_helper'
-import { requestJSON } from '../helpers/http'
 
 const blockDuration = 5 * 60000
 const maxAddrRows = 160
@@ -18,7 +18,7 @@ let Dygraph // lazy loaded on connect
 function txTypesFunc(d, binSize) {
   const p = []
 
-  d.time.map((n, i) => {
+  d.time.forEach((n, i) => {
     p.push([new Date(n), d.sentRtx[i], d.receivedRtx[i], d.tickets[i], d.votes[i], d.revokeTx[i]])
   })
 
@@ -32,7 +32,7 @@ function amountFlowProcessor(d, binSize) {
   const balanceData = []
   let balance = 0
 
-  d.time.map((n, i) => {
+  d.time.forEach((n, i) => {
     const v = d.net[i]
     let netReceived = 0
     let netSent = 0
@@ -57,14 +57,14 @@ function formatter(data) {
   if (data.xHTML !== undefined) {
     xHTML = humanize.date(data.x, false, true)
   }
-  let html = this.getLabels()[0] + ': ' + xHTML
-  data.series.map((series) => {
-    if (series.color === undefined) return ''
+  let html = `${this.getLabels()[0]}: ${xHTML}`
+  data.series.forEach((series) => {
+    if (series.color === undefined) return
     // Skip display of zeros
-    if (series.y === 0) return ''
-    const l = '<span style="color: ' + series.color + ';"> ' + series.labelHTML
-    html = '<span style="color:#2d2d2d;">' + html + '</span>'
-    html += '<br>' + series.dashHTML + l + ': ' + (isNaN(series.y) ? '' : series.y) + '</span>'
+    if (series.y === 0) return
+    const l = `<span style="color: ${series.color};"> ${series.labelHTML}`
+    html = `<span style="color:#2d2d2d;">${html}</span>`
+    html += `<br>${series.dashHTML}${l}: ${isNaN(series.y) ? '' : series.y}</span>`
   })
   return html
 }
@@ -74,22 +74,21 @@ function customizedFormatter(data) {
   if (data.xHTML !== undefined) {
     xHTML = humanize.date(data.x, false, true)
   }
-  let html = this.getLabels()[0] + ': ' + xHTML
-  data.series.map((series) => {
-    if (series.color === undefined) return ''
+  let html = `${this.getLabels()[0]}: ${xHTML}`
+  data.series.forEach((series) => {
+    if (series.color === undefined) return
     // Skip display of zeros
-    if (series.y === 0) return ''
-    const l = '<span style="color: ' + series.color + ';"> ' + series.labelHTML
-    html = '<span style="color:#2d2d2d;">' + html + '</span>'
-    html +=
-      '<br>' + series.dashHTML + l + ': ' + (isNaN(series.y) ? '' : series.y + ' DCR') + '</span> '
+    if (series.y === 0) return
+    const l = `<span style="color: ${series.color};"> ${series.labelHTML}`
+    html = `<span style="color:#2d2d2d;">${html}</span>`
+    html += `<br>${series.dashHTML}${l}: ${isNaN(series.y) ? '' : `${series.y} DCR`}</span> `
   })
   return html
 }
 
 function setTxnCountText(el, count) {
   if (el.dataset.formatted) {
-    el.textContent = count + ' transaction' + (count > 1 ? 's' : '')
+    el.textContent = `${count} transaction${count > 1 ? 's' : ''}`
   } else {
     el.textContent = count
   }
@@ -426,15 +425,9 @@ export default class extends Controller {
     const suffix = rowMax > 1 ? 's' : ''
     let rangeEnd = params.offset + count
     if (rangeEnd > rowMax) rangeEnd = rowMax
-    ctrl.rangeTarget.innerHTML =
-      'showing ' +
-      (params.offset + 1) +
-      ' &ndash; ' +
-      rangeEnd +
-      ' of ' +
-      rowMax.toLocaleString() +
-      ' transaction' +
-      suffix
+    ctrl.rangeTarget.innerHTML = `showing ${params.offset + 1} &ndash; ${
+      rangeEnd
+    } of ${rowMax.toLocaleString()} transaction${suffix}`
   }
 
   createGraph(processedData, otherOptions) {
@@ -501,7 +494,7 @@ export default class extends Controller {
   }
 
   async fetchGraphData(chart, bin) {
-    const cacheKey = chart + '-' + bin
+    const cacheKey = `${chart}-${bin}`
     if (ctrl.ajaxing === cacheKey) {
       return
     }
@@ -524,7 +517,7 @@ export default class extends Controller {
     let url = `/api/treasury/io/${bin}`
     if (this.dcrAddress !== 'treasury') {
       const chartKey = chart === 'balance' ? 'amountflow' : chart
-      url = '/api/address/' + ctrl.dcrAddress + '/' + chartKey + '/' + bin
+      url = `/api/address/${ctrl.dcrAddress}/${chartKey}/${bin}`
     }
 
     const graphDataResponse = await requestJSON(url)
@@ -541,11 +534,11 @@ export default class extends Controller {
 
     const binSize = Zoom.mapValue(bin) || blockDuration
     if (chart === 'types') {
-      ctrl.retrievedData['types-' + bin] = txTypesFunc(data, binSize)
+      ctrl.retrievedData[`types-${bin}`] = txTypesFunc(data, binSize)
     } else if (chart === 'amountflow' || chart === 'balance') {
       const processed = amountFlowProcessor(data, binSize)
-      ctrl.retrievedData['amountflow-' + bin] = processed.flow
-      ctrl.retrievedData['balance-' + bin] = processed.balance
+      ctrl.retrievedData[`amountflow-${bin}`] = processed.flow
+      ctrl.retrievedData[`balance-${bin}`] = processed.balance
     } else return
     setTimeout(() => {
       ctrl.popChartCache(chart, bin)
@@ -553,7 +546,7 @@ export default class extends Controller {
   }
 
   popChartCache(chart, bin) {
-    const cacheKey = chart + '-' + bin
+    const cacheKey = `${chart}-${bin}`
     const binSize = Zoom.mapValue(bin) || blockDuration
     if (!ctrl.retrievedData[cacheKey] || ctrl.requestedChart !== cacheKey) {
       return
@@ -624,7 +617,7 @@ export default class extends Controller {
     })
   }
 
-  changeGraph(e) {
+  changeGraph(_e) {
     this.settings.chart = this.chartType
     this.setGraphQuery()
     this.drawGraph()
@@ -709,8 +702,8 @@ export default class extends Controller {
   setIntervalButton(interval) {
     const button = ctrl.validGraphInterval(interval)
     if (!button) return false
-    ctrl.binputs.forEach((button) => {
-      button.classList.remove('btn-selected')
+    ctrl.binputs.forEach((btn) => {
+      btn.classList.remove('btn-selected')
     })
     button.classList.add('btn-selected')
   }
@@ -733,7 +726,7 @@ export default class extends Controller {
   }
 
   setSelectedZoom(zoomKey) {
-    this.zoomButtons.forEach(function (button) {
+    this.zoomButtons.forEach((button) => {
       if (button.name === zoomKey) {
         button.classList.add('btn-selected')
       } else {
@@ -795,16 +788,16 @@ export default class extends Controller {
           const count = this.txnCountTarget
           count.dataset.txnCount++
           setTxnCountText(count, count.dataset.txnCount)
-          this.numUnconfirmedTargets.forEach((tr, i) => {
+          this.numUnconfirmedTargets.forEach((tr, _i) => {
             const td = tr.querySelector('td.addr-unconfirmed-count')
-            let count = parseInt(tr.dataset.count)
-            if (count) count--
-            tr.dataset.count = count
-            if (count === 0) {
+            let unconfirmedCount = parseInt(tr.dataset.count)
+            if (unconfirmedCount) unconfirmedCount--
+            tr.dataset.count = unconfirmedCount
+            if (unconfirmedCount === 0) {
               tr.classList.add('.d-hide')
               delete tr.dataset.addressTarget
             } else {
-              td.textContent = count
+              td.textContent = unconfirmedCount
             }
           })
         }
@@ -824,8 +817,8 @@ export default class extends Controller {
     })
   }
 
-  hashOut(e) {
-    const target = e.srcElement || e.target
+  hashOut(_e) {
+    const target = _e.srcElement || _e.target
     const href = target.href
     this.hashTargets.forEach((link) => {
       if (link.href === href) {
@@ -834,7 +827,7 @@ export default class extends Controller {
     })
   }
 
-  toggleExpand(e) {
+  toggleExpand(_e) {
     const btn = this.expandoTarget
     if (btn.classList.contains('dcricon-expand')) {
       btn.classList.remove('dcricon-expand')

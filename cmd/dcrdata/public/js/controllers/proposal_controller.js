@@ -1,12 +1,12 @@
 import { Controller } from '@hotwired/stimulus'
-import { MiniMeter } from '../helpers/meters.js'
-import { darkEnabled } from '../services/theme_service'
-import globalEventBus from '../services/event_bus_service'
-import { getDefault } from '../helpers/module_helper'
-import { multiColumnBarPlotter, synchronize } from '../helpers/chart_helper'
 import dompurify from 'dompurify'
-import humanize from '../helpers/humanize_helper'
+import { multiColumnBarPlotter, synchronize } from '../helpers/chart_helper'
 import { requestJSON } from '../helpers/http'
+import humanize from '../helpers/humanize_helper'
+import { MiniMeter } from '../helpers/meters.js'
+import { getDefault } from '../helpers/module_helper'
+import globalEventBus from '../services/event_bus_service'
+import { darkEnabled } from '../services/theme_service'
 
 const common = {
   labelsKMB: true,
@@ -65,20 +65,15 @@ function legendFormatter(data) {
   let html
   if (data.x == null) {
     html = data.series
-      .map(function (series) {
-        return (
-          series.dashHTML +
-          ' <span style="color:' +
-          series.color +
-          ';">' +
-          series.labelHTML +
-          ' </span> '
-        )
+      .map((series) => {
+        return `${series.dashHTML} <span style="color:${series.color};">${
+          series.labelHTML
+        } </span> `
       })
       .join('')
   } else {
-    html = this.getLabels()[0] + ': ' + humanize.date(data.x) + ' UTC &nbsp;&nbsp;'
-    data.series.forEach(function (series, index) {
+    html = `${this.getLabels()[0]}: ${humanize.date(data.x)} UTC &nbsp;&nbsp;`
+    data.series.forEach((series, index) => {
       if (!series.isVisible) return
 
       let symbol = ''
@@ -91,14 +86,10 @@ function legendFormatter(data) {
         // html += ' <br> '
       }
 
-      const labeledData =
-        '<span style="color:' +
-        series.color +
-        ';">' +
-        series.labelHTML +
-        ' </span> : ' +
-        Math.abs(series.y)
-      html += series.dashHTML + ' ' + labeledData + '' + symbol + ' &nbsp;'
+      const labeledData = `<span style="color:${series.color};">${
+        series.labelHTML
+      } </span> : ${Math.abs(series.y)}`
+      html += `${series.dashHTML} ${labeledData}${symbol} &nbsp;`
     })
   }
   dompurify.sanitize(html, { FORBID_TAGS: ['svg', 'math'] })
@@ -150,7 +141,7 @@ export default class extends Controller {
     }
     this.approvalMeter = new MiniMeter(this.approvalMeterTarget, opts)
 
-    chartData = await requestJSON('/api/proposal/' + this.tokenTarget.dataset.hash)
+    chartData = await requestJSON(`/api/proposal/${this.tokenTarget.dataset.hash}`)
     if (!chartData) return
     Dygraph = await getDefault(
       import(/* webpackChunkName: "dygraphs" */ '../vendor/dygraphs.min.js')
@@ -163,7 +154,7 @@ export default class extends Controller {
   }
 
   disconnect() {
-    gs.map((chart) => {
+    gs.forEach((chart) => {
       chart.destroy()
     })
     globalEventBus.off('NIGHT_MODE', this.setNightMode)
@@ -181,7 +172,7 @@ export default class extends Controller {
     cumulativeData = []
     hourlyVotesData = []
 
-    chartData.time.map((n, i) => {
+    chartData.time.forEach((n, i) => {
       const formatedDate = new Date(n * 1000)
       yes += chartData.yes[i]
       total += chartData.no[i] + chartData.yes[i]
