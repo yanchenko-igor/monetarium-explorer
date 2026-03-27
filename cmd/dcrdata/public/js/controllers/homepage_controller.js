@@ -1,13 +1,13 @@
 import { Controller } from '@hotwired/stimulus'
-import { each } from 'lodash-es'
 import dompurify from 'dompurify'
-import humanize from '../helpers/humanize_helper'
-import ws from '../services/messagesocket_service'
-import { keyNav } from '../services/keyboard_navigation_service'
-import globalEventBus from '../services/event_bus_service'
+import { each } from 'lodash-es'
 import { fadeIn } from '../helpers/animation_helper'
+import humanize from '../helpers/humanize_helper'
 import Mempool from '../helpers/mempool_helper'
-import { copyIcon, alertArea } from './clipboard_controller'
+import globalEventBus from '../services/event_bus_service'
+import { keyNav } from '../services/keyboard_navigation_service'
+import ws from '../services/messagesocket_service'
+import { alertArea, copyIcon } from './clipboard_controller'
 
 function incrementValue(element) {
   if (element) {
@@ -73,11 +73,6 @@ export default class extends Controller {
       'mpTicketBar',
       'mpRevBar',
       'voteTally',
-      'blockVotes',
-      'blockHeight',
-      'blockSize',
-      'blockTotal',
-      'consensusMsg',
       'powConverted',
       'convertedDev',
       'convertedSupply',
@@ -89,7 +84,6 @@ export default class extends Controller {
   }
 
   connect() {
-    this.ticketsPerBlock = parseInt(this.mpVoteCountTarget.dataset.ticketsPerBlock)
     const mempoolData = this.mempoolTarget.dataset
     ws.send('getmempooltxs', mempoolData.id)
     this.mempool = new Mempool(mempoolData, this.voteTallyTargets)
@@ -149,7 +143,6 @@ export default class extends Controller {
 
     this.mempoolTarget.textContent = humanize.threeSigFigs(totals.total)
     this.setBars(totals)
-    this.setVotes()
   }
 
   setBars(totals) {
@@ -157,34 +150,6 @@ export default class extends Controller {
     this.mpVoteBarTarget.style.width = `${(totals.vote / totals.total) * 100}%`
     this.mpTicketBarTarget.style.width = `${(totals.ticket / totals.total) * 100}%`
     this.mpRevBarTarget.style.width = `${(totals.rev / totals.total) * 100}%`
-  }
-
-  setVotes() {
-    const hash = this.blockVotesTarget.dataset.hash
-    const votes = this.mempool.blockVoteTally(hash)
-    this.blockVotesTarget.querySelectorAll('div').forEach((div, i) => {
-      const span = div.firstElementChild
-      if (i < votes.affirm) {
-        span.className = 'd-inline-block dcricon-affirm'
-        div.dataset.tooltip = 'the stakeholder has voted to accept this block'
-      } else if (i < votes.affirm + votes.reject) {
-        span.className = 'd-inline-block dcricon-reject'
-        div.dataset.tooltip = 'the stakeholder has voted to reject this block'
-      } else {
-        span.className = 'd-inline-block dcricon-missing'
-        div.dataset.tooltip = 'this vote has not been received yet'
-      }
-    })
-    const threshold = this.ticketsPerBlock / 2
-    if (votes.affirm > threshold) {
-      this.consensusMsgTarget.textContent = 'approved'
-      this.consensusMsgTarget.className = 'small text-green'
-    } else if (votes.reject > threshold) {
-      this.consensusMsgTarget.textContent = 'rejected'
-      this.consensusMsgTarget.className = 'small text-danger'
-    } else {
-      this.consensusMsgTarget.textContent = ''
-    }
   }
 
   renderLatestTransactions(txs, incremental) {
@@ -250,13 +215,6 @@ export default class extends Controller {
     this.devFundTarget.innerHTML = humanize.decimalParts(treasuryTotal / 100000000, true, 0)
     this.hashrateTarget.innerHTML = humanize.decimalParts(ex.hash_rate, false, 8, 2)
     this.hashrateDeltaTarget.innerHTML = humanize.fmtPercentage(ex.hash_rate_change_month)
-    this.blockVotesTarget.dataset.hash = blockData.block.hash
-    this.setVotes()
-    const block = blockData.block
-    this.blockHeightTarget.textContent = block.height
-    this.blockHeightTarget.href = `/block/${block.hash}`
-    this.blockSizeTarget.textContent = humanize.bytes(block.size)
-    this.blockTotalTarget.textContent = humanize.threeSigFigs(block.total)
 
     if (ex.exchange_rate) {
       const xcRate = ex.exchange_rate.value
