@@ -19,13 +19,13 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v6"
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/dcrutil/v4"
+	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/dcrutil"
 	"github.com/decred/slog"
 	flags "github.com/jessevdk/go-flags"
 
-	"github.com/decred/dcrdata/v8/db/dbtypes"
-	"github.com/decred/dcrdata/v8/netparams"
+	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	"github.com/monetarium/monetarium-explorer/netparams"
 )
 
 const (

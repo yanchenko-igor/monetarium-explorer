@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/decred/dcrd/certgen"
+	"github.com/monetarium/monetarium-node/certgen"
 	credentials "google.golang.org/grpc/credentials"
 )
 

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/decred/dcrd/wire"
-	"github.com/decred/dcrdata/db/dcrpg/v8/internal"
+	"github.com/monetarium/monetarium-node/wire"
+	"github.com/monetarium/monetarium-explorer/db/dcrpg/internal"
 )
 
 func TestGetAddressTransactionsRawWithSkip(t *testing.T) {
