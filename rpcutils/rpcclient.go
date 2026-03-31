@@ -72,8 +72,8 @@ func NewAsyncTxClient(c *rpcclient.Client) *AsyncTxClient {
 // Any of the following dcrd RPC API versions are deemed compatible with
 // dcrdata.
 var compatibleChainServerAPIs = []semver.Semver{
-	semver.NewSemver(7, 0, 0),
-	semver.NewSemver(8, 0, 0), // removed methods we no longer use i.e. searchrawtransactions
+	semver.NewSemver(8, 0, 0),
+	semver.NewSemver(8, 3, 0), // monetarium-node v1.0.14
 }
 
 var (
@@ -137,7 +137,7 @@ func ConnectNodeRPC(host, user, pass, cert string, disableTLS, disableReconnect 
 		return nil, nodeVer, fmt.Errorf("unable to get node RPC version")
 	}
 
-	dcrdVer := ver["dcrdjsonrpcapi"]
+	dcrdVer := ver["monetariumjsonrpcapi"]
 	nodeVer = semver.NewSemver(dcrdVer.Major, dcrdVer.Minor, dcrdVer.Patch)
 
 	// Check if the dcrd RPC API version is compatible with dcrdata.

@@ -1218,7 +1218,9 @@ type Vout struct {
 	TxIndex          uint32           `json:"tx_index"`
 	TxTree           int8             `json:"tx_tree"`
 	TxType           int16            `json:"tx_type"`
-	Value            uint64           `json:"value"`
+	Value            uint64           `json:"value"`    // VAR atoms (int64 range)
+	CoinType         uint8            `json:"coin_type"` // 0=VAR, 1-255=SKA
+	SKAValue         string           `json:"ska_value,omitempty"` // SKA atoms as decimal string
 	Version          uint16           `json:"version"`
 	ScriptPubKeyData ScriptPubKeyData `json:"pkScript"`
 	Mixed            bool             `json:"mixed"`
@@ -2106,9 +2108,13 @@ type Tx struct {
 	Locktime    uint32    `json:"locktime"`
 	Expiry      uint32    `json:"expiry"`
 	Size        uint32    `json:"size"`
-	Spent       int64     `json:"spent"`
-	Sent        int64     `json:"sent"`
-	Fees        int64     `json:"fees"`
+	Spent       int64     `json:"spent"`  // VAR atoms only
+	Sent        int64     `json:"sent"`   // VAR atoms only
+	Fees        int64     `json:"fees"`   // VAR atoms only
+	// Per-coin totals for multi-coin blocks (SKA amounts as decimal atom strings)
+	SpentByCoin map[uint8]string `json:"spent_by_coin,omitempty"`
+	SentByCoin  map[uint8]string `json:"sent_by_coin,omitempty"`
+	FeesByCoin  map[uint8]string `json:"fees_by_coin,omitempty"`
 	MixCount    int32     `json:"mix_count"`
 	MixDenom    int64     `json:"mix_denom"`
 	NumVin      uint32    `json:"numvin"`

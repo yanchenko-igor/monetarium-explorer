@@ -498,8 +498,10 @@ func TxPrevOutsByAddr(txAddrOuts MempoolAddressStore, txnsStore TxnsStore, msgTx
 		// prevOut.Index indicates which output.
 		txOut := prevTx.TxOut[prevOut.Index]
 
-		// Get the values.
-		valsIn[inIdx] = txOut.Value
+		// Get the values (VAR only; SKA inputs are tracked separately via SKAValueIn).
+		if txOut.CoinType == 0 { // cointype.CoinTypeVAR
+			valsIn[inIdx] = txOut.Value
+		}
 
 		// Extract the addresses from this output's PkScript.
 		_, txAddrs := stdscript.ExtractAddrs(txOut.Version, txOut.PkScript, params)
@@ -756,6 +758,7 @@ func OutPointAddresses(outPoint *wire.OutPoint, c RawTransactionGetter,
 	// For the TxOut of interest, extract the list of addresses
 	txOut := txOuts[outPoint.Index]
 	_, txAddrs := stdscript.ExtractAddrs(txOut.Version, txOut.PkScript, params)
+	// Return VAR amount; SKA outputs have Value=0 (use txOut.SKAValue for big.Int precision).
 	value := dcrutil.Amount(txOut.Value)
 	addresses := make([]string, 0, len(txAddrs))
 	for _, txAddr := range txAddrs {
@@ -1069,7 +1072,10 @@ func FeeRateInfoBlock(block *dcrutil.Block) *chainjson.FeeInfoBlock {
 			amtIn += msgTx.TxIn[iv].ValueIn
 		}
 		for iv := range msgTx.TxOut {
-			amtOut += msgTx.TxOut[iv].Value
+			// Stake tickets are VAR-only; guard anyway.
+			if msgTx.TxOut[iv].CoinType == 0 { // cointype.CoinTypeVAR
+				amtOut += msgTx.TxOut[iv].Value
+			}
 		}
 		fee := dcrutil.Amount(1000*(amtIn-amtOut)).ToCoin() / float64(msgTx.SerializeSize())
 		if fee < minFee {
