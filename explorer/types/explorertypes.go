@@ -475,6 +475,8 @@ type BlockInfo struct {
 	TotalMixed            int64
 	StakeValidationHeight int64
 	Subsidy               *chainjson.GetBlockSubsidyResult
+	// CoinAmounts holds per-coin totals (VAR key=0, SKA-n key=n) as decimal atom strings.
+	CoinAmounts map[uint8]string `json:"coin_amounts,omitempty"`
 }
 
 // Conversion is a representation of some amount of DCR in another index.

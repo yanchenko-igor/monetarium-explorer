@@ -717,6 +717,8 @@ type BlockDataBasic struct {
 	NumTx      uint32  `json:"txlength"`
 	MiningFee  *int64  `json:"fees,omitempty"`
 	TotalSent  *int64  `json:"total_sent,omitempty"`
+	// CoinAmounts holds per-coin totals (VAR key=0, SKA-n key=n) as decimal atom strings.
+	CoinAmounts map[uint8]string `json:"coin_amounts,omitempty"`
 	// TicketPoolInfo may be nil for side chain blocks.
 	PoolInfo *TicketPoolInfo `json:"ticket_pool,omitempty"`
 }
@@ -747,6 +749,8 @@ type BlockExplorerExtraInfo struct {
 	TxLen            int                              `json:"tx"`
 	CoinSupply       int64                            `json:"coin_supply"`
 	NextBlockSubsidy *chainjson.GetBlockSubsidyResult `json:"next_block_subsidy"`
+	// CoinAmounts holds per-coin totals (VAR key=0, SKA-n key=n) as decimal atom strings.
+	CoinAmounts map[uint8]string `json:"coin_amounts,omitempty"`
 }
 
 // BlockTransactionCounts contains the regular and stake transaction counts for
