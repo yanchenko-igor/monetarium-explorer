@@ -102,9 +102,6 @@ func TestBuildHomeBlockRows_HasSKAData(t *testing.T) {
 	if len(rowsWithSKA) != 1 {
 		t.Fatalf("expected 1 row, got %d", len(rowsWithSKA))
 	}
-	if !rowsWithSKA[0].HasSKAData {
-		t.Errorf("expected HasSKAData=true for height=1 (has sub-rows), got false")
-	}
 	if len(rowsWithSKA[0].SKASubRows) == 0 {
 		t.Errorf("expected non-empty SKASubRows for height=1")
 	}
@@ -114,9 +111,6 @@ func TestBuildHomeBlockRows_HasSKAData(t *testing.T) {
 	rowsNoSKA := buildHomeBlockRows([]*types.BlockBasic{bNoSKA})
 	if len(rowsNoSKA) != 1 {
 		t.Fatalf("expected 1 row, got %d", len(rowsNoSKA))
-	}
-	if rowsNoSKA[0].HasSKAData {
-		t.Errorf("expected HasSKAData=false for height=9 (no sub-rows), got true")
 	}
 	if len(rowsNoSKA[0].SKASubRows) != 0 {
 		t.Errorf("expected empty SKASubRows for height=9, got %d", len(rowsNoSKA[0].SKASubRows))
@@ -134,9 +128,6 @@ func TestBuildHomeBlockRows_SKASubRowTokenTypeNonEmpty(t *testing.T) {
 			t.Fatalf("height=%d: expected 1 row, got %d", height, len(rows))
 		}
 		r := rows[0]
-		if !r.HasSKAData {
-			continue
-		}
 		for i, sub := range r.SKASubRows {
 			if sub.TokenType == "" {
 				t.Errorf("height=%d sub-row[%d]: TokenType is empty", height, i)
