@@ -766,8 +766,12 @@ func _main(ctx context.Context) error {
 		r.With(explorer.TransactionHashCtx, explorer.TransactionIoIndexCtx).Get("/tx/{txid}/{inout}/{inoutid}", explore.TxPage)
 		r.With(explorer.AddressPathCtx).Get("/address/{address}", explore.AddressPage)
 		r.With(explorer.AddressPathCtx).Get("/addresstable/{address}", explore.AddressTable)
-		r.Get("/proposals", explore.ProposalsPage)
-		r.With(explorer.ProposalPathCtx).Get("/proposal/{proposaltoken}", explore.ProposalPage)
+		r.Get("/proposals", func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "proposals not available", http.StatusGone)
+		})
+		r.With(explorer.ProposalPathCtx).Get("/proposal/{proposaltoken}", func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "proposals not available", http.StatusGone)
+		})
 		r.Get("/decodetx", explore.DecodeTxPage)
 		r.Get("/search", explore.Search)
 		r.Get("/ticketpool", explore.Ticketpool)
@@ -789,11 +793,19 @@ func _main(ctx context.Context) error {
 		withCache.Get("/disapproved", explore.DisapprovedBlocks)
 		withCache.Get("/mempool", explore.Mempool)
 		withCache.Get("/charts", explore.Charts)
-		withCache.Get("/treasury", explore.TreasuryPage)
-		withCache.Get("/treasurytable", explore.TreasuryTable)
+		withCache.Get("/treasury", func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "treasury not available", http.StatusGone)
+		})
+		withCache.Get("/treasurytable", func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "treasury not available", http.StatusGone)
+		})
 		withCache.Get("/parameters", explore.ParametersPage)
-		withCache.Get("/agendas", explore.AgendasPage)
-		withCache.With(explorer.AgendaPathCtx).Get("/agenda/{agendaid}", explore.AgendaPage)
+		withCache.Get("/agendas", func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "agendas not available", http.StatusGone)
+		})
+		withCache.With(explorer.AgendaPathCtx).Get("/agenda/{agendaid}", func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "agendas not available", http.StatusGone)
+		})
 		withCache.Get("/attack-cost", explore.AttackCost)
 	})
 

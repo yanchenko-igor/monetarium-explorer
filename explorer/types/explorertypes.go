@@ -432,6 +432,22 @@ type Vout struct {
 	Version         uint16
 }
 
+// CoinRowData holds per-coin summary data for the expandable blocks table.
+type CoinRowData struct {
+	CoinType uint8
+	Symbol   string // "VAR", "SKA-1", ...
+	TxCount  int
+	Amount   string // formatted amount string
+	Size     uint32
+}
+
+// CoinFillData holds per-coin mempool fill bar data.
+type CoinFillData struct {
+	Symbol  string
+	FillPct float64 // 0.0–1.0
+	Color   string  // "green", "yellow", "red"
+}
+
 // TrimmedBlockInfo models data needed to display block info on the new home page
 type TrimmedBlockInfo struct {
 	Time         TimeDef
@@ -443,6 +459,8 @@ type TrimmedBlockInfo struct {
 	Tickets      []*TrimmedTxInfo
 	Revocations  []*TrimmedTxInfo
 	Transactions []*TrimmedTxInfo
+	// CoinRows holds per-coin row data for the expandable blocks table.
+	CoinRows []CoinRowData
 }
 
 // BlockInfo models data for display on the block page
@@ -538,13 +556,15 @@ type TrimmedMempoolInfo struct {
 type MempoolInfo struct {
 	sync.RWMutex
 	MempoolShort
-	Transactions []MempoolTx `json:"tx"`
-	Tickets      []MempoolTx `json:"tickets"`
-	Votes        []MempoolTx `json:"votes"`
-	Revocations  []MempoolTx `json:"revs"`
-	TSpends      []MempoolTx `json:"tspends"`
-	TAdds        []MempoolTx `json:"tadds"`
-	Ident        uint64      `json:"id"`
+	Transactions []MempoolTx    `json:"tx"`
+	Tickets      []MempoolTx    `json:"tickets"`
+	Votes        []MempoolTx    `json:"votes"`
+	Revocations  []MempoolTx    `json:"revs"`
+	TSpends      []MempoolTx    `json:"tspends"`
+	TAdds        []MempoolTx    `json:"tadds"`
+	Ident        uint64         `json:"id"`
+	// CoinFills holds per-coin mempool fill bar data for the homepage.
+	CoinFills []CoinFillData `json:"coin_fills,omitempty"`
 }
 
 // DeepCopy makes a deep copy of MempoolInfo, where all the slice and map data

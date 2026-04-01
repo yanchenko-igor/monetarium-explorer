@@ -5974,6 +5974,11 @@ func (pgb *ChainDB) GetExplorerBlock(ctx context.Context, hash string) *exptypes
 		Subsidy:               pgb.BlockSubsidy(ctx, b.Height, b.Voters),
 	}
 
+	// Populate per-coin amounts from the block summary (computed at collection time).
+	if summary := pgb.GetSummaryByHash(ctx, hash, false); summary != nil && summary.CoinAmounts != nil {
+		block.CoinAmounts = summary.CoinAmounts
+	}
+
 	if data.PoWHash != "" {
 		block.PoWHash = data.PoWHash
 	} else if pgb.IsDCP0011Active(b.Height) {
