@@ -302,296 +302,84 @@ build ./... + go test ./...
 homepage loads, blocks appear with VAR and SKA-1 data.
 
 
-
-Task 10 (final): Complete SQL schema migration for multi-coin support
+> Task 10: SQL schema migration for multi-coin support
 Commit: feat: complete SQL schema and Go code for multi-coin (VAR+SKA)
 
-Objective: Add coin_type/ska_value to vouts, vins, addresses, swaps; add ska_fees to transactions; convert FLOAT8 price/reward to TEXT; update every Go struct, QueryRow 
-argument list, and Scan call to match.
+Objective: Extend the PostgreSQL schema to store per-coin data (VAR + SKA types), remove the treasury, and keep all Go insert/scan call sites in sync with the new column
+counts.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-## 1. SQL DDL — db/dcrpg/internal/
+## Schema changes
 
-### vinoutstmts.go
+vins — add coin_type INT2 NOT NULL DEFAULT 0 after value_in.
 
-CreateVinTable — add after value_in INT8:
-sql
-coin_type INT2 NOT NULL DEFAULT 0,
+vouts — add coin_type INT2 NOT NULL DEFAULT 0 after value; add ska_value TEXT after mixed. Update SelectCoinSupply to filter coin_type = 0 (VAR only).
 
+transactions — add ska_fees JSONB after fees.
 
-CreateVoutTable — add after value INT8:
-sql
-coin_type INT2 NOT NULL DEFAULT 0,
+addresses — add coin_type INT2 NOT NULL DEFAULT 0 and ska_value TEXT after value.
 
-Add after mixed BOOLEAN DEFAULT FALSE:
-sql
-ska_value TEXT,
+swaps — add coin_type INT2 NOT NULL DEFAULT 0 after value.
 
+tickets — change price FLOAT8 and fee FLOAT8 to TEXT. Add ::NUMERIC cast wherever these columns are compared or aggregated in queries.
 
-insertVinRow — 11→12 params:
-sql
-value_in, coin_type, is_valid, is_mainchain, block_time, tx_type)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+votes — change ticket_price FLOAT8 and vote_reward FLOAT8 to TEXT.
 
-
-UpsertVinRow ON CONFLICT — shift $8,$9,$10 → $9,$10,$11:
-sql
-SET is_valid = $9, is_mainchain = $10, block_time = $11,
-    prev_tx_hash = $4, prev_tx_index = $5, prev_tx_tree = $6
-
-
-insertVoutRow — 8→10 params:
-sql
-INSERT INTO vouts (tx_hash, tx_index, tx_tree, value, coin_type,
-    version, script_type, script_addresses, mixed, ska_value)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-
-
-UpsertVoutRow ON CONFLICT — shift $5 → $6:
-sql
-SET version = $6 RETURNING id;
-
-
-SelectUTXOs — add to SELECT:
-sql
-vouts.coin_type, vouts.ska_value
-
-
-SelectVoutAddressesByTxOut — add to SELECT:
-sql
-SELECT id, script_addresses, value, mixed, coin_type, ska_value FROM vouts ...
-
-
-SelectCoinSupply — add to WHERE:
-sql
-AND vins.coin_type = 0
-
-
-### txstmts.go
-
-CreateTransactionTable — add after fees INT8:
-sql
-ska_fees JSONB,
-
-
-insertTxRow — 22→23 params, ska_fees at $15, all subsequent shift +1:
-sql
--- columns: ..., fees, ska_fees, mix_count, mix_denom, ...
--- values:  ..., $14,  $15,      $16,       $17, ..., $22, $23
-
-
-UpsertTxRow ON CONFLICT — shift $21,$22 → $22,$23:
-sql
-SET is_valid = $22, is_mainchain = $23 RETURNING id;
-
-
-SelectFullTxByHash / SelectFullTxsByHash — add ska_fees to SELECT list after fees.
-
-### addrstmts.go
-
-CreateAddressTable — add after value INT8:
-sql
-coin_type INT2 NOT NULL DEFAULT 0,
-ska_value TEXT,
-
-
-insertAddressRow — 10→12 params (appended at end):
-sql
-INSERT INTO addresses (..., tx_type, coin_type, ska_value)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-
-
-addrsColumnNames — add coin_type, ska_value.
-
-SelectAddressSpentUnspentCountAndValue — add coin_type to SELECT and GROUP BY:
-sql
-SELECT (tx_type = 0) AS is_regular, coin_type, COUNT(*), SUM(value),
-    is_funding, (matching_tx_hash IS NULL) AS all_empty_matching
-FROM addresses WHERE address = $1 AND valid_mainchain
-GROUP BY tx_type=0, coin_type, is_funding, matching_tx_hash IS NULL
-ORDER BY count, is_funding;
-
-
-### stakestmts.go
-
-CreateTicketsTable — price FLOAT8 → price TEXT, fee FLOAT8 → fee TEXT
-
-CreateVotesTable — ticket_price FLOAT8 → ticket_price TEXT, vote_reward FLOAT8 → vote_reward TEXT
-
-SelectTicketsForPriceAtLeast/AtMost — price → price::NUMERIC
-
-SelectTicketsByPrice / selectTicketsByPurchaseDate — price → price::NUMERIC
-
-### swap.go
-
-CreateAtomicSwapTable — add after value INT8:
-sql
-coin_type INT2 NOT NULL DEFAULT 0,
-
-
-InsertContractSpend — 10→11 params, add coin_type as $11.
-
-### treasury.go
-
-Replace entire file:
-go
-package internal
-// Treasury removed: monetarium-node has no treasury subsystem.
-
+treasury — stub out the entire file: empty-string constants for all statement names, no-op functions for MakeTreasuryInsertStatement and MakeSelectTreasuryIOStatement. 
+The table is not created.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-## 2. Go Structs — db/dbtypes/types.go
+## Go struct changes (db/dbtypes/types.go)
 
-VinTxProperty — add:
-go
-CoinType uint8 `json:"coin_type"`
-
-
-AddressRow — add:
-go
-CoinType uint8  `json:"coin_type"`
-SKAValue string `json:"ska_value,omitempty"`
-
-
-UTXOData — add:
-go
-CoinType uint8
-SKAValue string
-
-
-(Vout already has CoinType/SKAValue; Tx already has FeesByCoin ✓)
+Add CoinType uint8 to VinTxProperty, AddressRow, and UTXOData.
+Add SKAValue string to AddressRow and UTXOData.
+Add ToJSONB(v interface{}) []byte helper (marshal to JSON, return nil on error).
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-## 3. QueryRow argument fixes — db/dcrpg/queries.go
+## Go call site rules (db/dcrpg/queries.go and pgblockchain.go)
 
-### insertVoutsStmt (~line 2053) — 8→10 args
-go
-err := stmt.QueryRow(
-    vout.TxHash, vout.TxIndex, vout.TxTree, vout.Value, vout.CoinType,
-    int32(vout.Version), vout.ScriptPubKeyData.Type,
-    addressList(vout.ScriptPubKeyData.Addresses), vout.Mixed, vout.SKAValue).Scan(&id)
+Rule: every stmt.QueryRow(...) or tx.QueryRow(sqlStmt, ...) that inserts into vins, vouts, transactions, or addresses must pass exactly as many arguments as the 
+corresponding INSERT statement has $N placeholders. Every rows.Scan(...) or .Scan(...) that reads from those tables must have exactly as many destination pointers as the
+SELECT returns columns.
 
-Also add to AddressRow population: CoinType: vout.CoinType, SKAValue: vout.SKAValue
+Verify each of the following functions passes/scans the right count:
 
-### insertVinsStmt (~line 1930) — 11→12 args
-go
-err := stmt.QueryRow(vin.TxID, vin.TxIndex, vin.TxTree,
-    vin.PrevTxHash, vin.PrevTxIndex, vin.PrevTxTree,
-    vin.ValueIn, vin.CoinType, vin.IsValid, vin.IsMainchain, vin.Time, vin.TxType).Scan(&id)
+| Function | Table | Check |
+|---|---|---|
+| insertVinsStmt | vins | args match insertVinRow placeholder count |
+| insertVoutsStmt | vouts | args match insertVoutRow placeholder count; also populate CoinType/SKAValue on the AddressRow built inside the loop |
+| insertTxnsStmt | transactions | args match insertTxRow; pass ToJSONB(tx.FeesByCoin) for ska_fees |
+| insertAddressRowsDbTx | addresses | args match insertAddressRow |
+| insertSpendingAddressRow | addresses | args match insertAddressRow; source CoinType/SKAValue from spentUtxoData |
+| retrieveTxOutData | vouts | Scan destinations match SelectVoutAddressesByTxOut column count |
+| retrieveUTXOsStmt | vouts | Scan destinations match SelectUTXOs column count |
+| scanAddressQueryRows | addresses | Scan destinations match addrsColumnNames column count |
+| SelectAddressSpentUnspentCountAndValue scan | addresses | Scan destinations match the SELECT column count (includes coin_type) |
+| retrieveDbTxByHash | transactions | Scan destinations match SelectFullTxByHash; scan ska_fees into []byte then json.Unmarshal into FeesByCoin |
+| retrieveDbTxsByHash | transactions | Same as above inside rows.Next() loop |
 
-
-### insertTxnsStmt (~line 2865) — 22→23 args
-go
-err := stmt.QueryRow(
-    tx.BlockHash, tx.BlockHeight, tx.BlockTime,
-    tx.TxType, int16(tx.Version), tx.Tree, tx.TxID, tx.BlockIndex,
-    int32(tx.Locktime), int32(tx.Expiry), tx.Size, tx.Spent, tx.Sent, tx.Fees, dbtypes.ToJSONB(tx.FeesByCoin),
-    tx.MixCount, tx.MixDenom,
-    tx.NumVin, dbtypes.UInt64Array(tx.VinDbIds),
-    tx.NumVout, dbtypes.UInt64Array(tx.VoutDbIds), tx.IsValid,
-    tx.IsMainchainBlock).Scan(&id)
-
-
-### insertAddressRowsDbTx (~line 1335) — 10→12 args
-go
-err := stmt.QueryRow(dbA.Address, dbA.MatchingTxHash, dbA.TxHash,
-    dbA.TxVinVoutIndex, dbA.VinVoutDbID, dbA.Value, dbA.TxBlockTime,
-    dbA.IsFunding, dbA.ValidMainChain, dbA.TxType, dbA.CoinType, dbA.SKAValue).Scan(&id)
-
-
-### insertSpendingAddressRow (~line 2728) — 10→12 args
-go
-err := tx.QueryRow(sqlStmt, addrs[i], fundingTxHash, spendingTxHash,
-    spendingTxVinIndex, vinDbID, value, blockTime, isFunding,
-    mainchain && valid, txType, spentUtxoData.CoinType, spentUtxoData.SKAValue).Scan(&rowID)
-
+pgblockchain.go — TreasuryBalance: replace the entire body with a no-op that returns &dbtypes.TreasuryBalance{Height: tipHeight}, nil. No DB query.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-## 4. Scan fixes — db/dcrpg/queries.go
+## Migration (db/dcrpg/upgrades.go)
 
-### retrieveUTXOsStmt (~line 2445) — 6→8 scans
-go
-err = rows.Scan(&utxo.VoutDbID, &utxo.TxHash, &utxo.TxIndex, &addresses,
-    &utxo.Value, &utxo.Mixed, &utxo.UTXOData.CoinType, &utxo.UTXOData.SKAValue)
-
-
-### retrieveTxOutData (~line 2663) — 4→6 scans
-go
-err := tx.QueryRow(internal.SelectVoutAddressesByTxOut, txid, idx, tree).
-    Scan(&data.VoutDbID, &addrArray, &data.Value, &data.Mixed, &data.CoinType, &data.SKAValue)
-
-
-### scanAddressQueryRows (~line 1772) — 11→13 scans
-go
-err = rows.Scan(&id, &addr.Address, &addr.MatchingTxHash, &addr.TxHash, &addr.TxType,
-    &addr.ValidMainChain, &txVinIndex, &addr.TxBlockTime, &vinDbID,
-    &addr.Value, &addr.IsFunding, &addr.CoinType, &addr.SKAValue)
-
-
-### retrieveDbTxByHash (~line 2956) — 22→23 scans
-
-Scan ska_fees into a []byte, then unmarshal into FeesByCoin:
-go
-var skaFeesJSON []byte
-err = db.QueryRowContext(ctx, internal.SelectFullTxByHash, txHash).Scan(&id,
-    &dbTx.BlockHash, &dbTx.BlockHeight, &dbTx.BlockTime,
-    &dbTx.TxType, &dbTx.Version, &dbTx.Tree, &dbTx.TxID, &dbTx.BlockIndex,
-    &dbTx.Locktime, &dbTx.Expiry, &dbTx.Size, &dbTx.Spent, &dbTx.Sent,
-    &dbTx.Fees, &skaFeesJSON, &dbTx.MixCount, &dbTx.MixDenom, &dbTx.NumVin, &vinDbIDs,
-    &dbTx.NumVout, &voutDbIDs, &dbTx.IsValid, &dbTx.IsMainchainBlock)
-if len(skaFeesJSON) > 0 {
-    _ = json.Unmarshal(skaFeesJSON, &dbTx.FeesByCoin)
-}
-
-
-### retrieveDbTxsByHash (~line 3005) — same pattern as above inside rows.Next() loop.
+Add a schema version bump that ALTER TABLE ... ADD COLUMN IF NOT EXISTS for all new columns, and ALTER COLUMN ... TYPE TEXT USING ...::TEXT for the ticket/vote price 
+columns.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-## 5. pgblockchain.go — TreasuryBalance
+Test: go build ./... green; fresh DB init and block sync complete without any sql: expected N destination arguments or pq: got N parameters errors.
 
-go
-func (pgb *ChainDB) TreasuryBalance(ctx context.Context) (*dbtypes.TreasuryBalance, error) {
-    _, tipHeight := pgb.BestBlock()
-    return &dbtypes.TreasuryBalance{Height: tipHeight}, nil
-}
-
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-
-## 6. Migration — db/dcrpg/upgrades.go
-
-sql
-ALTER TABLE vins      ADD COLUMN IF NOT EXISTS coin_type INT2 NOT NULL DEFAULT 0;
-ALTER TABLE vouts     ADD COLUMN IF NOT EXISTS coin_type INT2 NOT NULL DEFAULT 0;
-ALTER TABLE vouts     ADD COLUMN IF NOT EXISTS ska_value TEXT;
-ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ska_fees JSONB;
-ALTER TABLE addresses ADD COLUMN IF NOT EXISTS coin_type INT2 NOT NULL DEFAULT 0;
-ALTER TABLE addresses ADD COLUMN IF NOT EXISTS ska_value TEXT;
-ALTER TABLE swaps     ADD COLUMN IF NOT EXISTS coin_type INT2 NOT NULL DEFAULT 0;
-ALTER TABLE tickets   ALTER COLUMN price TYPE TEXT USING price::TEXT;
-ALTER TABLE tickets   ALTER COLUMN fee   TYPE TEXT USING fee::TEXT;
-ALTER TABLE votes     ALTER COLUMN ticket_price TYPE TEXT USING ticket_price::TEXT;
-ALTER TABLE votes     ALTER COLUMN vote_reward  TYPE TEXT USING vote_reward::TEXT;
-
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-
-Test: go build ./... green; fresh DB init succeeds; block sync with VAR+SKA outputs completes without any sql: expected N destination arguments or pq: got N parameters 
-errors.
-
-Demo: Full block import stores VAR and SKA-1 outputs correctly; address history, UTXO retrieval, and transaction lookups all return without scan errors.
+Demo: Blocks with VAR and SKA-1 outputs sync cleanly; address history and transaction lookups return without scan errors.
 
 > Task 11: Fix fatal error when treasury/subsidy address is absent
 Commit: fix: allow empty OrganizationPkScript when no treasury
