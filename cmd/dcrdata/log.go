@@ -9,9 +9,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/monetarium/monetarium-node/rpcclient"
 	"github.com/decred/slog"
 	"github.com/jrick/logrotate/rotator"
+	"github.com/monetarium/monetarium-node/rpcclient"
 
 	"github.com/monetarium/monetarium-explorer/cmd/dcrdata/internal/api"
 	"github.com/monetarium/monetarium-explorer/cmd/dcrdata/internal/api/insight"

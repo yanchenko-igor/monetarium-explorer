@@ -108,10 +108,10 @@ func TestSelectColumnCounts(t *testing.T) {
 		sql      string
 		wantCols int
 	}{
-		{"SelectUTXOs", SelectUTXOs, 8},                         // id,tx_hash,tx_index,script_addresses,value,mixed,coin_type,ska_value
-		{"SelectVoutAddressesByTxOut", SelectVoutAddressesByTxOut, 6}, // id,script_addresses,value,mixed,coin_type,ska_value
-		{"SelectFullTxByHash", SelectFullTxByHash, 24},           // id + 23 columns
-		{"addrsColumnNames", "SELECT " + addrsColumnNames + " FROM x", 13}, // id,address,...,coin_type,ska_value
+		{"SelectUTXOs", SelectUTXOs, 8},                                                       // id,tx_hash,tx_index,script_addresses,value,mixed,coin_type,ska_value
+		{"SelectVoutAddressesByTxOut", SelectVoutAddressesByTxOut, 6},                         // id,script_addresses,value,mixed,coin_type,ska_value
+		{"SelectFullTxByHash", SelectFullTxByHash, 24},                                        // id + 23 columns
+		{"addrsColumnNames", "SELECT " + addrsColumnNames + " FROM x", 13},                    // id,address,...,coin_type,ska_value
 		{"SelectAddressSpentUnspentCountAndValue", SelectAddressSpentUnspentCountAndValue, 6}, // is_regular,coin_type,count,sum,is_funding,all_empty_matching
 	}
 	for _, tc := range cases {

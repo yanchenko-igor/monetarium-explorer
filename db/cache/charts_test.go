@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
-	"github.com/monetarium/monetarium-node/chaincfg"
 	"github.com/monetarium/monetarium-explorer/txhelpers"
+	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
 )
 
 var tempDir string

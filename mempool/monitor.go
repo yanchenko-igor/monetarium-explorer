@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/monetarium/monetarium-node/blockchain/stake"
-	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
 	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
 	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
 
 	exptypes "github.com/monetarium/monetarium-explorer/explorer/types"

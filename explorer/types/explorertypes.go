@@ -12,13 +12,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	"github.com/monetarium/monetarium-explorer/txhelpers"
 	"github.com/monetarium/monetarium-node/blockchain/stake"
 	"github.com/monetarium/monetarium-node/chaincfg"
 	"github.com/monetarium/monetarium-node/dcrutil"
 	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
 	"github.com/monetarium/monetarium-node/wire"
-	"github.com/monetarium/monetarium-explorer/db/dbtypes"
-	"github.com/monetarium/monetarium-explorer/txhelpers"
 )
 
 // Types of votes
@@ -559,13 +559,13 @@ type TrimmedMempoolInfo struct {
 type MempoolInfo struct {
 	sync.RWMutex
 	MempoolShort
-	Transactions []MempoolTx    `json:"tx"`
-	Tickets      []MempoolTx    `json:"tickets"`
-	Votes        []MempoolTx    `json:"votes"`
-	Revocations  []MempoolTx    `json:"revs"`
-	TSpends      []MempoolTx    `json:"tspends"`
-	TAdds        []MempoolTx    `json:"tadds"`
-	Ident        uint64         `json:"id"`
+	Transactions []MempoolTx `json:"tx"`
+	Tickets      []MempoolTx `json:"tickets"`
+	Votes        []MempoolTx `json:"votes"`
+	Revocations  []MempoolTx `json:"revs"`
+	TSpends      []MempoolTx `json:"tspends"`
+	TAdds        []MempoolTx `json:"tadds"`
+	Ident        uint64      `json:"id"`
 	// CoinFills holds per-coin mempool fill bar data for the homepage.
 	CoinFills []CoinFillData `json:"coin_fills,omitempty"`
 }

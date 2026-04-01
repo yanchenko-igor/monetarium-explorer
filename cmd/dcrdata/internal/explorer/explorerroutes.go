@@ -18,20 +18,20 @@ import (
 	"time"
 
 	"github.com/monetarium/monetarium-node/blockchain/stake"
-	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
 	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
 
 	"github.com/monetarium/monetarium-node/dcrutil"
 	"github.com/monetarium/monetarium-node/txscript/stdaddr"
 	"github.com/monetarium/monetarium-node/txscript/stdscript"
 
+	ticketvotev1 "github.com/decred/politeia/politeiawww/api/ticketvote/v1"
+	"github.com/monetarium/monetarium-explorer/db/dbtypes"
 	"github.com/monetarium/monetarium-explorer/exchanges"
+	"github.com/monetarium/monetarium-explorer/explorer/types"
 	"github.com/monetarium/monetarium-explorer/gov/agendas"
 	pitypes "github.com/monetarium/monetarium-explorer/gov/politeia/types"
-	"github.com/monetarium/monetarium-explorer/db/dbtypes"
-	"github.com/monetarium/monetarium-explorer/explorer/types"
 	"github.com/monetarium/monetarium-explorer/txhelpers"
-	ticketvotev1 "github.com/decred/politeia/politeiawww/api/ticketvote/v1"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"

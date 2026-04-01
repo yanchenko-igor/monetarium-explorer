@@ -154,4 +154,3 @@ func Test_processTransactions_MixedBlock(t *testing.T) {
 		t.Errorf("SKA tx SentByCoin[1]: want %s, got %s", skaOut, sentStr)
 	}
 }
-

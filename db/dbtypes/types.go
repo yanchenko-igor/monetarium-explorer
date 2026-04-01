@@ -17,10 +17,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
 	"github.com/monetarium/monetarium-node/dcrutil"
 	"github.com/monetarium/monetarium-node/txscript/stdscript"
-	"github.com/lib/pq"
 
 	"github.com/monetarium/monetarium-explorer/db/dbtypes/internal"
 	"github.com/monetarium/monetarium-explorer/txhelpers"
@@ -1218,8 +1218,8 @@ type Vout struct {
 	TxIndex          uint32           `json:"tx_index"`
 	TxTree           int8             `json:"tx_tree"`
 	TxType           int16            `json:"tx_type"`
-	Value            uint64           `json:"value"`    // VAR atoms (int64 range)
-	CoinType         uint8            `json:"coin_type"` // 0=VAR, 1-255=SKA
+	Value            uint64           `json:"value"`               // VAR atoms (int64 range)
+	CoinType         uint8            `json:"coin_type"`           // 0=VAR, 1-255=SKA
 	SKAValue         string           `json:"ska_value,omitempty"` // SKA atoms as decimal string
 	Version          uint16           `json:"version"`
 	ScriptPubKeyData ScriptPubKeyData `json:"pkScript"`
@@ -2113,20 +2113,20 @@ type Tx struct {
 	Locktime    uint32    `json:"locktime"`
 	Expiry      uint32    `json:"expiry"`
 	Size        uint32    `json:"size"`
-	Spent       int64     `json:"spent"`  // VAR atoms only
-	Sent        int64     `json:"sent"`   // VAR atoms only
-	Fees        int64     `json:"fees"`   // VAR atoms only
+	Spent       int64     `json:"spent"` // VAR atoms only
+	Sent        int64     `json:"sent"`  // VAR atoms only
+	Fees        int64     `json:"fees"`  // VAR atoms only
 	// Per-coin totals for multi-coin blocks (SKA amounts as decimal atom strings)
 	SpentByCoin map[uint8]string `json:"spent_by_coin,omitempty"`
 	SentByCoin  map[uint8]string `json:"sent_by_coin,omitempty"`
 	FeesByCoin  map[uint8]string `json:"fees_by_coin,omitempty"`
-	MixCount    int32     `json:"mix_count"`
-	MixDenom    int64     `json:"mix_denom"`
-	NumVin      uint32    `json:"numvin"`
-	VinDbIds    []uint64  `json:"vindbids"`
-	NumVout     uint32    `json:"numvout"`
-	Vouts       []*Vout   `json:"vouts"`
-	VoutDbIds   []uint64  `json:"voutdbids"`
+	MixCount    int32            `json:"mix_count"`
+	MixDenom    int64            `json:"mix_denom"`
+	NumVin      uint32           `json:"numvin"`
+	VinDbIds    []uint64         `json:"vindbids"`
+	NumVout     uint32           `json:"numvout"`
+	Vouts       []*Vout          `json:"vouts"`
+	VoutDbIds   []uint64         `json:"voutdbids"`
 	// NOTE: VoutDbIds may not be needed if there is a vout table since each
 	// vout will have a tx_dbid
 	IsValid          bool `json:"valid"`
@@ -2136,7 +2136,13 @@ type Tx struct {
 // ToJSONB marshals v to JSON bytes for use as a PostgreSQL JSONB parameter.
 // Returns nil on marshal error (stored as SQL NULL).
 func ToJSONB(v interface{}) []byte {
-	b, _ := json.Marshal(v)
+	if v == nil {
+		return nil
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return nil
+	}
 	return b
 }
 

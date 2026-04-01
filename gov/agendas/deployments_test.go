@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"github.com/asdine/storm/v3"
+	"github.com/monetarium/monetarium-explorer/db/dbtypes"
 	"github.com/monetarium/monetarium-node/dcrjson"
 	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
-	"github.com/monetarium/monetarium-explorer/db/dbtypes"
 )
 
 var db *storm.DB

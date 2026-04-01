@@ -7,15 +7,15 @@ package internal
 // Stub constants and functions keep the compiler happy until callers are removed.
 
 const (
-	CreateTreasuryTable          = `-- treasury table removed`
-	IndexTreasuryOnTxHash        = ``
-	DeindexTreasuryOnTxHash      = ``
-	IndexTreasuryOnBlockHeight   = ``
-	DeindexTreasuryOnBlockHeight = ``
-	SelectTreasuryBalance        = ``
-	SelectTreasuryTxns           = ``
-	SelectTypedTreasuryTxns      = ``
-	DeleteTreasuryTxns           = ``
+	CreateTreasuryTable            = `-- treasury table removed`
+	IndexTreasuryOnTxHash          = ``
+	DeindexTreasuryOnTxHash        = ``
+	IndexTreasuryOnBlockHeight     = ``
+	DeindexTreasuryOnBlockHeight   = ``
+	SelectTreasuryBalance          = ``
+	SelectTreasuryTxns             = ``
+	SelectTypedTreasuryTxns        = ``
+	DeleteTreasuryTxns             = ``
 	UpdateTreasuryMainchainByBlock = ``
 )
 

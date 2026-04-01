@@ -6,9 +6,9 @@ package mempool
 import (
 	"time"
 
+	apitypes "github.com/monetarium/monetarium-explorer/api/types"
 	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
 	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
-	apitypes "github.com/monetarium/monetarium-explorer/api/types"
 )
 
 // MempoolInfo models basic data about the node's mempool

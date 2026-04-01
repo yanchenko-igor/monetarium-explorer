@@ -10,10 +10,10 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/decred/slog"
 	"github.com/monetarium/monetarium-explorer/db/cache"
 	"github.com/monetarium/monetarium-explorer/testutil/dbconfig"
-	"github.com/decred/slog"
+	"github.com/monetarium/monetarium-node/chaincfg"
 )
 
 type MemStats runtime.MemStats

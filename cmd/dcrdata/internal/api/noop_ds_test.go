@@ -3,22 +3,22 @@ package api
 import (
 	"context"
 
-	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
-	"github.com/monetarium/monetarium-node/wire"
-	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
 	apitypes "github.com/monetarium/monetarium-explorer/api/types"
 	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
+	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
+	"github.com/monetarium/monetarium-node/wire"
 )
 
 // noopDS satisfies DataSource with zero-value returns. Embed and override only
 // the methods needed by a specific test.
 type noopDS struct{}
 
-func (noopDS) GetHeight(_ context.Context) (int64, error)                                  { return 0, nil }
-func (noopDS) GetBestBlockHash(_ context.Context) (string, error)                          { return "", nil }
-func (noopDS) GetBlockHash(_ context.Context, _ int64) (string, error)                     { return "", nil }
-func (noopDS) GetBlockHeight(_ context.Context, _ string) (int64, error)                   { return 0, nil }
-func (noopDS) GetBlockByHash(_ context.Context, _ string) (*wire.MsgBlock, error)          { return nil, nil }
+func (noopDS) GetHeight(_ context.Context) (int64, error)                         { return 0, nil }
+func (noopDS) GetBestBlockHash(_ context.Context) (string, error)                 { return "", nil }
+func (noopDS) GetBlockHash(_ context.Context, _ int64) (string, error)            { return "", nil }
+func (noopDS) GetBlockHeight(_ context.Context, _ string) (int64, error)          { return 0, nil }
+func (noopDS) GetBlockByHash(_ context.Context, _ string) (*wire.MsgBlock, error) { return nil, nil }
 func (noopDS) SpendingTransaction(_ context.Context, _ string, _ uint32) (string, uint32, error) {
 	return "", 0, nil
 }
@@ -52,10 +52,10 @@ func (noopDS) AgendaVotes(_ context.Context, _ string, _ int) (*dbtypes.AgendaVo
 func (noopDS) AddressRowsCompact(_ context.Context, _ string) ([]*dbtypes.AddressRowCompact, error) {
 	return nil, nil
 }
-func (noopDS) Height() int64                    { return 0 }
-func (noopDS) IsDCP0010Active(_ int64) bool     { return false }
-func (noopDS) IsDCP0011Active(_ int64) bool     { return false }
-func (noopDS) IsDCP0012Active(_ int64) bool     { return false }
+func (noopDS) Height() int64                                     { return 0 }
+func (noopDS) IsDCP0010Active(_ int64) bool                      { return false }
+func (noopDS) IsDCP0011Active(_ int64) bool                      { return false }
+func (noopDS) IsDCP0012Active(_ int64) bool                      { return false }
 func (noopDS) AllAgendas() (map[string]dbtypes.MileStone, error) { return nil, nil }
 func (noopDS) GetTicketInfo(_ context.Context, _ string) (*apitypes.TicketInfo, error) {
 	return nil, nil
@@ -76,9 +76,9 @@ func (noopDS) GetPoolInfoRange(_ context.Context, _, _ int) []apitypes.TicketPoo
 func (noopDS) GetPoolValAndSizeRange(_ context.Context, _, _ int) ([]float64, []uint32) {
 	return nil, nil
 }
-func (noopDS) GetPool(_ int64) ([]string, error)                                    { return nil, nil }
-func (noopDS) CurrentCoinSupply(_ context.Context) *apitypes.CoinSupply             { return nil }
-func (noopDS) GetHeader(_ int) *chainjson.GetBlockHeaderVerboseResult               { return nil }
+func (noopDS) GetPool(_ int64) ([]string, error)                        { return nil, nil }
+func (noopDS) CurrentCoinSupply(_ context.Context) *apitypes.CoinSupply { return nil }
+func (noopDS) GetHeader(_ int) *chainjson.GetBlockHeaderVerboseResult   { return nil }
 func (noopDS) GetBlockHeaderByHash(_ context.Context, _ string) (*wire.BlockHeader, error) {
 	return nil, nil
 }
@@ -104,7 +104,7 @@ func (noopDS) GetAllTxOut(_ context.Context, _ *chainhash.Hash) []*apitypes.TxOu
 func (noopDS) GetTransactionsForBlockByHash(_ context.Context, _ string) *apitypes.BlockTransactions {
 	return nil
 }
-func (noopDS) GetStakeDiffEstimates(_ context.Context) *apitypes.StakeDiff { return nil }
+func (noopDS) GetStakeDiffEstimates(_ context.Context) *apitypes.StakeDiff  { return nil }
 func (noopDS) GetSummary(_ context.Context, _ int) *apitypes.BlockDataBasic { return nil }
 func (noopDS) GetSummaryRange(_ context.Context, _, _ int) []*apitypes.BlockDataBasic {
 	return nil

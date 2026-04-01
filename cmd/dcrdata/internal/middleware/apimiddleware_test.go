@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/monetarium/monetarium-node/chaincfg"
 	"github.com/go-chi/chi/v5"
+	"github.com/monetarium/monetarium-node/chaincfg"
 )
 
 func TestGetAddressCtx(t *testing.T) {

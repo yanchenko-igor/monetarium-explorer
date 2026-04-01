@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/monetarium/monetarium-explorer/db/dbtypes"
 	"github.com/go-chi/chi/v5"
+	"github.com/monetarium/monetarium-explorer/db/dbtypes"
 )
 
 type contextKey int

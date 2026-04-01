@@ -8,8 +8,8 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/monetarium/monetarium-explorer/db/dcrpg/internal"
 	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	"github.com/monetarium/monetarium-explorer/db/dcrpg/internal"
 )
 
 var createTableStatements = [][2]string{

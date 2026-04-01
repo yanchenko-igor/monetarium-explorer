@@ -14,12 +14,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/monetarium/monetarium-node/chaincfg"
-	"github.com/monetarium/monetarium-node/dcrutil"
+	humanize "github.com/dustin/go-humanize"
 	"github.com/monetarium/monetarium-explorer/db/dbtypes"
 	"github.com/monetarium/monetarium-explorer/explorer/types"
 	"github.com/monetarium/monetarium-explorer/txhelpers"
-	humanize "github.com/dustin/go-humanize"
+	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/dcrutil"
 )
 
 type pageTemplate struct {

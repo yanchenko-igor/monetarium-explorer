@@ -12,10 +12,10 @@ import (
 	"runtime"
 	"strings"
 
+	flags "github.com/jessevdk/go-flags"
+	"github.com/monetarium/monetarium-explorer/netparams"
 	"github.com/monetarium/monetarium-node/chaincfg"
 	"github.com/monetarium/monetarium-node/dcrutil"
-	"github.com/monetarium/monetarium-explorer/netparams"
-	flags "github.com/jessevdk/go-flags"
 )
 
 const (
@@ -48,20 +48,20 @@ var (
 
 type config struct {
 	// General application behavior
-	ConfigPath           string `short:"c" long:"config" description:"Path to a custom configuration file. (~/.chkdcrpg/rateserver.conf)" env:"CHKDCRPG_CONFIG_PATH"`
-	AppDirectory         string `long:"appdir" description:"Path to application home directory. (~/.chkdcrpg)" env:"CHKDCRPG_APPDIR_PATH"`
+	ConfigPath            string `short:"c" long:"config" description:"Path to a custom configuration file. (~/.chkdcrpg/rateserver.conf)" env:"CHKDCRPG_CONFIG_PATH"`
+	AppDirectory          string `long:"appdir" description:"Path to application home directory. (~/.chkdcrpg)" env:"CHKDCRPG_APPDIR_PATH"`
 	ExplorerDataDirectory string `long:"explorer-datadir" description:"Path to a monetarium-explorer datadir" env:"MONETARIUM_DATA_DIR"`
-	LogPath              string `long:"logpath" description:"Directory to log output. ([appdir]/logs/)" env:"CHKDCRPG_LOG_PATH"`
-	ShowVersion          bool   `short:"V" long:"version" description:"Display version information and exit"`
-	TestNet              bool   `long:"testnet" description:"Use the test network (default mainnet)"`
-	SimNet               bool   `long:"simnet" description:"Use the simulation test network (default mainnet)"`
-	DebugLevel           string `short:"d" long:"debuglevel" description:"Logging level {trace, debug, info, warn, error, critical}"`
-	Quiet                bool   `short:"q" long:"quiet" description:"Easy way to set debuglevel to error"`
-	LogDir               string `long:"logdir" description:"Directory to log output"`
-	HTTPProfile          bool   `long:"httpprof" short:"p" description:"Start HTTP profiler."`
-	CPUProfile           string `long:"cpuprofile" description:"File for CPU profiling."`
-	MemProfile           string `long:"memprofile" description:"File for memory profiling."`
-	HidePGConfig         bool   `long:"hidepgconfig" description:"Blocks logging of the PostgreSQL db configuration on system start up."`
+	LogPath               string `long:"logpath" description:"Directory to log output. ([appdir]/logs/)" env:"CHKDCRPG_LOG_PATH"`
+	ShowVersion           bool   `short:"V" long:"version" description:"Display version information and exit"`
+	TestNet               bool   `long:"testnet" description:"Use the test network (default mainnet)"`
+	SimNet                bool   `long:"simnet" description:"Use the simulation test network (default mainnet)"`
+	DebugLevel            string `short:"d" long:"debuglevel" description:"Logging level {trace, debug, info, warn, error, critical}"`
+	Quiet                 bool   `short:"q" long:"quiet" description:"Easy way to set debuglevel to error"`
+	LogDir                string `long:"logdir" description:"Directory to log output"`
+	HTTPProfile           bool   `long:"httpprof" short:"p" description:"Start HTTP profiler."`
+	CPUProfile            string `long:"cpuprofile" description:"File for CPU profiling."`
+	MemProfile            string `long:"memprofile" description:"File for memory profiling."`
+	HidePGConfig          bool   `long:"hidepgconfig" description:"Blocks logging of the PostgreSQL db configuration on system start up."`
 
 	// DB
 	DBHostPort string `long:"dbhost" description:"DB host"`

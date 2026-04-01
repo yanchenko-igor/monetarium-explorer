@@ -19,10 +19,10 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v6"
-	"github.com/monetarium/monetarium-node/chaincfg"
-	"github.com/monetarium/monetarium-node/dcrutil"
 	"github.com/decred/slog"
 	flags "github.com/jessevdk/go-flags"
+	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/dcrutil"
 
 	"github.com/monetarium/monetarium-explorer/db/dbtypes"
 	"github.com/monetarium/monetarium-explorer/netparams"

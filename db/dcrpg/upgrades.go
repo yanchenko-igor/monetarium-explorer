@@ -8,9 +8,9 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/monetarium/monetarium-node/chaincfg"
 	"github.com/monetarium/monetarium-explorer/db/dcrpg/internal"
 	"github.com/monetarium/monetarium-explorer/stakedb"
+	"github.com/monetarium/monetarium-node/chaincfg"
 )
 
 // The database schema is versioned in the meta table as follows.

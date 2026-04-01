@@ -10,9 +10,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/decred/slog"
 	"github.com/monetarium/monetarium-node/chaincfg"
 	"github.com/monetarium/monetarium-node/txscript/stdaddr"
-	"github.com/decred/slog"
 	survey "gopkg.in/AlecAivazis/survey.v1"
 
 	exptypes "github.com/monetarium/monetarium-explorer/explorer/types"

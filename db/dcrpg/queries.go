@@ -19,13 +19,13 @@ import (
 	"github.com/monetarium/monetarium-node/chaincfg"
 	"github.com/monetarium/monetarium-node/wire"
 
-	"github.com/monetarium/monetarium-explorer/db/dcrpg/internal"
+	humanize "github.com/dustin/go-humanize"
+	"github.com/lib/pq"
 	apitypes "github.com/monetarium/monetarium-explorer/api/types"
 	"github.com/monetarium/monetarium-explorer/db/cache"
 	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	"github.com/monetarium/monetarium-explorer/db/dcrpg/internal"
 	"github.com/monetarium/monetarium-explorer/txhelpers"
-	humanize "github.com/dustin/go-humanize"
-	"github.com/lib/pq"
 )
 
 // dbBestBlock retrieves the best block hash and height from the meta table. The

@@ -16,9 +16,9 @@ import (
 	"github.com/monetarium/monetarium-node/dcrutil"
 	"github.com/monetarium/monetarium-node/rpcclient"
 
+	"github.com/decred/slog"
 	"github.com/monetarium/monetarium-explorer/rpcutils"
 	"github.com/monetarium/monetarium-explorer/txhelpers"
-	"github.com/decred/slog"
 )
 
 var host = flag.String("host", "127.0.0.1:9109", "node RPC host:port")

@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/monetarium/monetarium-explorer/txhelpers"
 	"github.com/monetarium/monetarium-node/blockchain/stake"
 	"github.com/monetarium/monetarium-node/chaincfg"
 	"github.com/monetarium/monetarium-node/cointype"
 	"github.com/monetarium/monetarium-node/txscript/stdscript"
 	"github.com/monetarium/monetarium-node/wire"
-	"github.com/monetarium/monetarium-explorer/txhelpers"
 )
 
 // DevSubsidyAddress returns the development subsidy address for the specified

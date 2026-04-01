@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
 	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
 )
 
 func TestCacheLock_TryLock(t *testing.T) {

@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/monetarium/monetarium-node/blockchain/standalone"
-	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
 	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
 	"github.com/monetarium/monetarium-node/dcrutil"
 	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
 	"github.com/monetarium/monetarium-node/rpcclient"
@@ -32,13 +32,13 @@ import (
 	"github.com/monetarium/monetarium-node/txscript/stdscript"
 	"github.com/monetarium/monetarium-node/wire"
 
+	apitypes "github.com/monetarium/monetarium-explorer/api/types"
 	m "github.com/monetarium/monetarium-explorer/cmd/dcrdata/internal/middleware"
+	"github.com/monetarium/monetarium-explorer/db/cache"
+	"github.com/monetarium/monetarium-explorer/db/dbtypes"
 	"github.com/monetarium/monetarium-explorer/exchanges"
 	"github.com/monetarium/monetarium-explorer/gov/agendas"
 	"github.com/monetarium/monetarium-explorer/gov/politeia"
-	apitypes "github.com/monetarium/monetarium-explorer/api/types"
-	"github.com/monetarium/monetarium-explorer/db/cache"
-	"github.com/monetarium/monetarium-explorer/db/dbtypes"
 	"github.com/monetarium/monetarium-explorer/txhelpers"
 )
 

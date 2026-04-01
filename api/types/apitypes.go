@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
-	"github.com/monetarium/monetarium-node/txscript/stdscript"
 	"github.com/monetarium/monetarium-explorer/db/dbtypes"
 	"github.com/monetarium/monetarium-explorer/txhelpers"
+	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
+	"github.com/monetarium/monetarium-node/txscript/stdscript"
 )
 
 // TimeAPI is a fall back dbtypes.TimeDef wrapper that allows API endpoints that
@@ -551,7 +551,7 @@ type APIStatus struct {
 	Height          uint32 `json:"node_height"`
 	NodeConnections int64  `json:"node_connections"`
 	APIVersion      int    `json:"api_version"`
-	ExplorerVersion  string `json:"explorer_version"`
+	ExplorerVersion string `json:"explorer_version"`
 	NetworkName     string `json:"network_name"`
 }
 
@@ -561,9 +561,9 @@ func NewStatus(nodeHeight uint32, conns int64, apiVersion int, explorerVersion, 
 		height:          nodeHeight,
 		nodeConnections: conns,
 		api: APIStatus{
-			APIVersion:     apiVersion,
+			APIVersion:      apiVersion,
 			ExplorerVersion: explorerVersion,
-			NetworkName:    netName,
+			NetworkName:     netName,
 		},
 	}
 }
@@ -579,7 +579,7 @@ func (s *Status) API() APIStatus {
 		Height:          s.height,
 		NodeConnections: s.nodeConnections,
 		APIVersion:      s.api.APIVersion,
-		ExplorerVersion:  s.api.ExplorerVersion,
+		ExplorerVersion: s.api.ExplorerVersion,
 		NetworkName:     s.api.NetworkName,
 	}
 }

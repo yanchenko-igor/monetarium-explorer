@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/decred/slog"
 	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
 	"github.com/monetarium/monetarium-node/rpcclient"
-	"github.com/decred/slog"
 )
 
 var (

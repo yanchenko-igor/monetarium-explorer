@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"strings"
 
-	m "github.com/monetarium/monetarium-explorer/cmd/dcrdata/internal/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	m "github.com/monetarium/monetarium-explorer/cmd/dcrdata/internal/middleware"
 	"github.com/rs/cors"
 )
 

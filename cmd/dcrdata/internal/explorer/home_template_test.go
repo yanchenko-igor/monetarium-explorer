@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/monetarium/monetarium-node/chaincfg"
 	"github.com/monetarium/monetarium-explorer/db/dbtypes"
 	"github.com/monetarium/monetarium-explorer/explorer/types"
+	"github.com/monetarium/monetarium-node/chaincfg"
 )
 
 // viewsFolder is relative to this package's location.
@@ -62,13 +62,13 @@ func TestHomeTemplate_BlocksTable(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			data := struct {
 				*CommonPageData
-				Info        *types.HomeInfo
-				Mempool     *types.MempoolInfo
-				BestBlock   *types.BlockBasic
-				BlockTally  []int
-				Consensus   int
-				Blocks      []*types.BlockBasic
-				Conversions interface{}
+				Info          *types.HomeInfo
+				Mempool       *types.MempoolInfo
+				BestBlock     *types.BlockBasic
+				BlockTally    []int
+				Consensus     int
+				Blocks        []*types.BlockBasic
+				Conversions   interface{}
 				PercentChange float64
 			}{
 				CommonPageData: &CommonPageData{Links: &links{}, Tip: &types.WebBasicBlock{}},

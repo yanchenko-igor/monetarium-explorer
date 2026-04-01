@@ -13,9 +13,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/monetarium/monetarium-node/dcrutil"
 	"github.com/monetarium/monetarium-explorer/exchanges"
 	dcrrates "github.com/monetarium/monetarium-explorer/exchanges/ratesproto"
+	"github.com/monetarium/monetarium-node/dcrutil"
 	"google.golang.org/grpc"
 )
 

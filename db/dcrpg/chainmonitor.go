@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/monetarium/monetarium-explorer/txhelpers"
 	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
 	"github.com/monetarium/monetarium-node/wire"
-	"github.com/monetarium/monetarium-explorer/txhelpers"
 )
 
 // ChainMonitor responds to block connection and chain reorganization.

@@ -7,8 +7,8 @@ import (
 	"database/sql"
 	"strings"
 
-	"github.com/monetarium/monetarium-explorer/db/dcrpg/internal"
 	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	"github.com/monetarium/monetarium-explorer/db/dcrpg/internal"
 )
 
 // indexingInfo defines a minimalistic structure used to append new indexes

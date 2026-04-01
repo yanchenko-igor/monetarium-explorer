@@ -99,7 +99,7 @@ const (
 		WHERE prev_tx_hash=$1 AND prev_tx_index=$2 ORDER BY is_valid DESC, is_mainchain DESC, block_time DESC;`
 
 	SelectFundingOutpointIndxByVinID = `SELECT prev_tx_index FROM vins WHERE id=$1;`
-	SelectAllVinInfoByID = `SELECT tx_hash, tx_index, tx_tree, is_valid, is_mainchain, block_time,  --- could easily do this by tx_hash and tx_index
+	SelectAllVinInfoByID             = `SELECT tx_hash, tx_index, tx_tree, is_valid, is_mainchain, block_time,  --- could easily do this by tx_hash and tx_index
 		prev_tx_hash, prev_tx_index, prev_tx_tree, value_in, coin_type, tx_type FROM vins WHERE id = $1;`
 
 	/* alt without spend_tx_row_id

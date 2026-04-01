@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/monetarium/monetarium-node/chaincfg"
 	"github.com/monetarium/monetarium-explorer/semver"
 	"github.com/monetarium/monetarium-explorer/txhelpers"
+	"github.com/monetarium/monetarium-node/chaincfg"
 )
 
 // Keys for specifying chart data type.
