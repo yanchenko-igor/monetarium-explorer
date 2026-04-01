@@ -381,7 +381,94 @@ Test: go build ./... green; fresh DB init and block sync complete without any sq
 
 Demo: Blocks with VAR and SKA-1 outputs sync cleanly; address history and transaction lookups return without scan errors.
 
-> Task 11: Fix fatal error when treasury/subsidy address is absent
+
+Task 11: Tests for Task 10 schema correctness
+Commit: test: verify SQL column counts and select column consistency for multi-coin schema
+
+Objective: Extend db/dcrpg/internal/schema_test.go to catch at compile/test time the class of bugs that caused the runtime 
+sql: expected N destination arguments in Scan, not M errors.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+### What to add to schema_test.go
+
+TestSelectColumnCounts — for each SELECT statement that had a mismatched Scan, assert the expected column count using a simple comma-count helper on the SELECT list. 
+This documents the contract between SQL and Go:
+
+go
+func countSelectColumns(sql string) int {
+    // extract between SELECT and FROM
+    upper := strings.ToUpper(sql)
+    start := strings.Index(upper, "SELECT") + len("SELECT")
+    end := strings.Index(upper, "FROM")
+    if start < 0 || end < 0 || end <= start {
+        return 0
+    }
+    cols := strings.TrimSpace(sql[start:end])
+    return len(strings.Split(cols, ","))
+}
+
+func TestSelectColumnCounts(t *testing.T) {
+    cases := []struct {
+        name     string
+        sql      string
+        wantCols int
+    }{
+        // vouts
+        {"SelectUTXOs",              SelectUTXOs,              8}, // id,tx_hash,tx_index,script_addresses,value,mixed,coin_type,ska_value
+        {"SelectVoutAddressesByTxOut", SelectVoutAddressesByTxOut, 6}, // id,script_addresses,value,mixed,coin_type,ska_value
+        // transactions
+        {"SelectFullTxByHash",       SelectFullTxByHash,       24}, // id + 23 columns
+        // addresses
+        {"addrsColumnNames",         "SELECT " + addrsColumnNames + " FROM x", 13}, // id,address,...,coin_type,ska_value
+        {"SelectAddressSpentUnspentCountAndValue", SelectAddressSpentUnspentCountAndValue, 6}, // is_regular,coin_type,count,sum,is_funding,all_empty_matching
+    }
+    for _, tc := range cases {
+        t.Run(tc.name, func(t *testing.T) {
+            got := countSelectColumns(tc.sql)
+            if got != tc.wantCols {
+                t.Errorf("%s: expected %d SELECT columns, got %d", tc.name, tc.wantCols, got)
+            }
+        })
+    }
+}
+
+
+TestCoinSupplyVARFilter — assert SelectCoinSupply contains the VAR-only filter:
+go
+func TestCoinSupplyVARFilter(t *testing.T) {
+    if !strings.Contains(SelectCoinSupply, "coin_type = 0") {
+        t.Error("SelectCoinSupply must filter coin_type = 0 (VAR only)")
+    }
+}
+
+
+TestNumericCastOnTicketPrice — assert price comparisons use ::NUMERIC:
+go
+func TestNumericCastOnTicketPrice(t *testing.T) {
+    for _, sql := range []string{SelectTicketsForPriceAtLeast, SelectTicketsForPriceAtMost, SelectTicketsByPrice} {
+        if !strings.Contains(sql, "::NUMERIC") {
+            t.Errorf("ticket price query missing ::NUMERIC cast: %s", sql[:60])
+        }
+    }
+}
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+### What cannot be tested without a DB
+
+The Go-side Scan destination counts (e.g. retrieveUTXOsStmt, scanAddressQueryRows) require a live PostgreSQL connection. Those are covered by the existing 
+*_online_test.go files. The tests above catch the SQL side of the contract so mismatches are caught before hitting a DB.
+
+Test: go test ./db/dcrpg/internal/... passes with no failures.
+
+Demo: Running the tests after a schema change that removes a column immediately fails with a descriptive error rather than a runtime panic.
+
+
+> Task 12: Fix fatal error when treasury/subsidy address is absent
 Commit: fix: allow empty OrganizationPkScript when no treasury
 
 Objective: Remove the fatal startup error caused by DevSubsidyAddress failing on a nil OrganizationPkScript, which is the case for all monetarium-node network params.
