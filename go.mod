@@ -35,7 +35,7 @@ require (
 	github.com/google/go-cmp v0.5.4 // indirect
 	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
-	github.com/monetarium/monetarium-node/cointype v1.0.11 // indirect
+	github.com/monetarium/monetarium-node/cointype v1.0.14
 	github.com/monetarium/monetarium-node/crypto/blake256 v1.0.14 // indirect
 	github.com/monetarium/monetarium-node/crypto/rand v1.0.14 // indirect
 	github.com/monetarium/monetarium-node/crypto/ripemd160 v1.0.14 // indirect

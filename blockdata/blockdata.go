@@ -7,11 +7,13 @@ package blockdata
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
 	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
 	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/cointype"
 	"github.com/monetarium/monetarium-node/dcrutil"
 	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
 	"github.com/monetarium/monetarium-node/wire"
@@ -236,6 +238,14 @@ func (t *Collector) CollectBlockInfo(hash *chainhash.Hash) (*apitypes.BlockDataB
 		CoinSupply:       int64(coinSupply),
 		NextBlockSubsidy: nbSubsidy,
 	}
+
+	// Accumulate per-coin output totals from all transactions in the block.
+	coinAmounts := blockCoinAmounts(msgBlock)
+	if len(coinAmounts) > 0 {
+		blockdata.CoinAmounts = coinAmounts
+		extrainfo.CoinAmounts = coinAmounts
+	}
+
 	return blockdata, feeInfoBlock, blockHeaderResults, extrainfo, msgBlock, err
 }
 
@@ -371,4 +381,41 @@ func (t *Collector) Collect() (*BlockData, *wire.MsgBlock, error) {
 	}
 
 	return blockdata, msgBlock, err
+}
+
+// blockCoinAmounts iterates all transactions in a block and returns a map of
+// per-coin output totals as decimal atom strings (key 0=VAR, 1-255=SKA-n).
+func blockCoinAmounts(msgBlock *wire.MsgBlock) map[uint8]string {
+	var varTotal int64
+	skaTotal := make(map[uint8]*big.Int)
+
+	allTxs := append(msgBlock.Transactions, msgBlock.STransactions...)
+	for _, tx := range allTxs {
+		for _, txout := range tx.TxOut {
+			ct := txout.CoinType
+			if ct == cointype.CoinTypeVAR {
+				varTotal += txout.Value
+			} else if ct.IsSKA() && txout.SKAValue != nil {
+				k := uint8(ct)
+				if cur, ok := skaTotal[k]; ok {
+					cur.Add(cur, txout.SKAValue)
+				} else {
+					skaTotal[k] = new(big.Int).Set(txout.SKAValue)
+				}
+			}
+		}
+	}
+
+	if varTotal == 0 && len(skaTotal) == 0 {
+		return nil
+	}
+
+	out := make(map[uint8]string, 1+len(skaTotal))
+	if varTotal != 0 {
+		out[0] = fmt.Sprintf("%d", varTotal)
+	}
+	for k, v := range skaTotal {
+		out[k] = v.String()
+	}
+	return out
 }
