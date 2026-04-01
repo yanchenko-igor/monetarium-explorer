@@ -1,15 +1,15 @@
 module github.com/monetarium/monetarium-explorer/pubsub/democlient
 
-go 1.21
+go 1.23
 
 replace github.com/monetarium/monetarium-explorer => ../../
 
 require (
-	github.com/monetarium/monetarium-node/chaincfg v1.0.14
-	github.com/monetarium/monetarium-node/txscript v1.0.14
-	github.com/monetarium/monetarium-explorer v0.0.0
 	github.com/decred/slog v1.2.0
 	github.com/jessevdk/go-flags v1.5.0
+	github.com/monetarium/monetarium-explorer v0.0.0
+	github.com/monetarium/monetarium-node/chaincfg v1.0.14
+	github.com/monetarium/monetarium-node/txscript v1.0.14
 	gopkg.in/AlecAivazis/survey.v1 v1.8.7
 )
 
@@ -19,20 +19,7 @@ require (
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/dchest/siphash v1.2.3 // indirect
 	github.com/decred/base58 v1.0.6 // indirect
-	github.com/monetarium/monetarium-node/blockchain/stake v1.0.14 // indirect
-	github.com/monetarium/monetarium-node/blockchain/standalone v1.0.14 // indirect
-	github.com/monetarium/monetarium-node/chaincfg/chainhash v1.0.14 // indirect
-	github.com/monetarium/monetarium-node/crypto/blake256 v1.0.14 // indirect
-	github.com/monetarium/monetarium-node/crypto/rand v1.0.14 // indirect
-	github.com/monetarium/monetarium-node/crypto/ripemd160 v1.0.14 // indirect
-	github.com/monetarium/monetarium-node/database v1.0.14 // indirect
-	github.com/monetarium/monetarium-node/dcrec v1.0.14 // indirect
-	github.com/monetarium/monetarium-node/dcrec/edwards v1.0.14 // indirect
-	github.com/monetarium/monetarium-node/dcrec/secp256k1 v1.0.14 // indirect
-	github.com/monetarium/monetarium-node/dcrjson v1.0.14 // indirect
-	github.com/monetarium/monetarium-node/dcrutil v1.0.14 // indirect
-	github.com/monetarium/monetarium-node/rpc/jsonrpc/types v1.0.14 // indirect
-	github.com/monetarium/monetarium-node/wire v1.0.14 // indirect
+	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
 	github.com/dgraph-io/badger v1.6.2 // indirect
 	github.com/dgraph-io/ristretto v0.0.2 // indirect
 	github.com/dustin/go-humanize v1.0.1-0.20210705192016-249ff6c91207 // indirect
@@ -44,6 +31,21 @@ require (
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
+	github.com/monetarium/monetarium-node/blockchain/stake v1.0.14 // indirect
+	github.com/monetarium/monetarium-node/blockchain/standalone v1.0.14 // indirect
+	github.com/monetarium/monetarium-node/chaincfg/chainhash v1.0.14 // indirect
+	github.com/monetarium/monetarium-node/cointype v1.0.14 // indirect
+	github.com/monetarium/monetarium-node/crypto/blake256 v1.0.14 // indirect
+	github.com/monetarium/monetarium-node/crypto/rand v1.0.14 // indirect
+	github.com/monetarium/monetarium-node/crypto/ripemd160 v1.0.14 // indirect
+	github.com/monetarium/monetarium-node/database v1.0.14 // indirect
+	github.com/monetarium/monetarium-node/dcrec v1.0.14 // indirect
+	github.com/monetarium/monetarium-node/dcrec/edwards v1.0.14 // indirect
+	github.com/monetarium/monetarium-node/dcrec/secp256k1 v1.0.14 // indirect
+	github.com/monetarium/monetarium-node/dcrjson v1.0.14 // indirect
+	github.com/monetarium/monetarium-node/dcrutil v1.0.14 // indirect
+	github.com/monetarium/monetarium-node/rpc/jsonrpc/types v1.0.14 // indirect
+	github.com/monetarium/monetarium-node/wire v1.0.14 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	golang.org/x/crypto v0.33.0 // indirect

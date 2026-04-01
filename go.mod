@@ -3,7 +3,6 @@ module github.com/monetarium/monetarium-explorer
 go 1.23
 
 require (
-	github.com/davecgh/go-spew v1.1.1
 	github.com/decred/base58 v1.0.6
 	github.com/decred/slog v1.2.0
 	github.com/dgraph-io/badger v1.6.2
