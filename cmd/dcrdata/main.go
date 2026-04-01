@@ -83,7 +83,7 @@ func _main(ctx context.Context) error {
 	// Parse the configuration file, and setup logger.
 	cfg, err := loadConfig()
 	if err != nil {
-		fmt.Printf("Failed to load dcrdata config: %s\n", err.Error())
+		fmt.Printf("Failed to load monetarium-explorer config: %s\n", err.Error())
 		return err
 	}
 	defer func() {
@@ -1163,7 +1163,7 @@ func listenAndServeProto(ctx context.Context, wg *sync.WaitGroup, listen, proto 
 	go func() {
 		var err error
 		if proto == "https" {
-			err = server.ListenAndServeTLS("dcrdata.cert", "dcrdata.key")
+			err = server.ListenAndServeTLS("monetarium-explorer.cert", "monetarium-explorer.key")
 		} else {
 			err = server.ListenAndServe()
 		}

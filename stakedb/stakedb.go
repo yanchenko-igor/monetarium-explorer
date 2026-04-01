@@ -795,7 +795,7 @@ func (db *StakeDatabase) Open(dbName string) error {
 	if err != nil {
 		if strings.Contains(err.Error(), "resource temporarily unavailable") ||
 			strings.Contains(err.Error(), "is being used by another process") {
-			return fmt.Errorf("Stake DB already opened. dcrdata running?")
+			return fmt.Errorf("Stake DB already opened. monetarium-explorer running?")
 		}
 		if strings.Contains(err.Error(), "does not exist") {
 			log.Info("Creating new stake DB.")

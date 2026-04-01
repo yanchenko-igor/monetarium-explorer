@@ -33,7 +33,7 @@ var (
 	defaultDcrdHost          = "localhost"
 	defaultDaemonRPCCertFile = filepath.Join(dcrdHomeDir, "rpc.cert")
 
-	dcrdataHomeDir = dcrutil.AppDataDir("dcrdata", false)
+	dcrdataHomeDir = dcrutil.AppDataDir("monetarium-explorer", false)
 	dcrdataDataDir = filepath.Join(dcrdataHomeDir, defaultDataDirName)
 
 	defaultAppDirectory = dcrutil.AppDataDir("chkdcrpg", false)
@@ -41,16 +41,16 @@ var (
 	defaultLogDir       = filepath.Join(defaultAppDirectory, defaultLogDirname)
 
 	defaultDBHostPort = "127.0.0.1:5432"
-	defaultDBUser     = "dcrdata"
+	defaultDBUser     = "monetarium"
 	defaultDBPass     = ""
-	defaultDBName     = "dcrdata"
+	defaultDBName     = "monetarium"
 )
 
 type config struct {
 	// General application behavior
 	ConfigPath           string `short:"c" long:"config" description:"Path to a custom configuration file. (~/.chkdcrpg/rateserver.conf)" env:"CHKDCRPG_CONFIG_PATH"`
 	AppDirectory         string `long:"appdir" description:"Path to application home directory. (~/.chkdcrpg)" env:"CHKDCRPG_APPDIR_PATH"`
-	DcrdataDataDirectory string `long:"dcrdata-datadir" description:"Path to a dcrdata datadir" env:"DCRDATA_DATA_DIR"`
+	ExplorerDataDirectory string `long:"explorer-datadir" description:"Path to a monetarium-explorer datadir" env:"MONETARIUM_DATA_DIR"`
 	LogPath              string `long:"logpath" description:"Directory to log output. ([appdir]/logs/)" env:"CHKDCRPG_LOG_PATH"`
 	ShowVersion          bool   `short:"V" long:"version" description:"Display version information and exit"`
 	TestNet              bool   `long:"testnet" description:"Use the test network (default mainnet)"`
@@ -191,11 +191,11 @@ func loadConfig() (*config, error) {
 		return nil, err
 	}
 
-	if cfg.DcrdataDataDirectory == "" {
-		cfg.DcrdataDataDirectory = dcrdataDataDir
+	if cfg.ExplorerDataDirectory == "" {
+		cfg.ExplorerDataDirectory = dcrdataDataDir
 	}
-	cfg.DcrdataDataDirectory = filepath.Join(cfg.DcrdataDataDirectory, activeNet.Name)
-	cfg.DcrdataDataDirectory = cleanAndExpandPath(cfg.DcrdataDataDirectory)
+	cfg.ExplorerDataDirectory = filepath.Join(cfg.ExplorerDataDirectory, activeNet.Name)
+	cfg.ExplorerDataDirectory = cleanAndExpandPath(cfg.ExplorerDataDirectory)
 
 	// Set the host names and ports to the default if the user does not specify
 	// them.

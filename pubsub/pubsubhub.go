@@ -510,7 +510,7 @@ loop:
 			pushMsg.Message = buff.Bytes()
 
 		case sigByeNow:
-			pushMsg.Message = []byte(`"The dcrdata server is shutting down. Bye!"`)
+			pushMsg.Message = []byte(`"The monetarium-explorer server is shutting down. Bye!"`)
 			log.Tracef("Sending %v", string(pushMsg.Message))
 
 		// case sigSyncStatus:

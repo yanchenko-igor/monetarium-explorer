@@ -272,7 +272,7 @@ out:
 // root is a http.Handler intended for the API root path. This essentially
 // provides a heartbeat, and no information about the application status.
 func (c *appContext) root(w http.ResponseWriter, _ *http.Request) {
-	fmt.Fprint(w, "dcrdata api running")
+	fmt.Fprint(w, "monetarium-explorer api running")
 }
 
 func writeJSON(w http.ResponseWriter, thing interface{}, indent string) {

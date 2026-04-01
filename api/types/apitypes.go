@@ -551,18 +551,18 @@ type APIStatus struct {
 	Height          uint32 `json:"node_height"`
 	NodeConnections int64  `json:"node_connections"`
 	APIVersion      int    `json:"api_version"`
-	DcrdataVersion  string `json:"dcrdata_version"`
+	ExplorerVersion  string `json:"explorer_version"`
 	NetworkName     string `json:"network_name"`
 }
 
 // NewStatus is the constructor for a new Status.
-func NewStatus(nodeHeight uint32, conns int64, apiVersion int, dcrdataVersion, netName string) *Status {
+func NewStatus(nodeHeight uint32, conns int64, apiVersion int, explorerVersion, netName string) *Status {
 	return &Status{
 		height:          nodeHeight,
 		nodeConnections: conns,
 		api: APIStatus{
 			APIVersion:     apiVersion,
-			DcrdataVersion: dcrdataVersion,
+			ExplorerVersion: explorerVersion,
 			NetworkName:    netName,
 		},
 	}
@@ -579,7 +579,7 @@ func (s *Status) API() APIStatus {
 		Height:          s.height,
 		NodeConnections: s.nodeConnections,
 		APIVersion:      s.api.APIVersion,
-		DcrdataVersion:  s.api.DcrdataVersion,
+		ExplorerVersion:  s.api.ExplorerVersion,
 		NetworkName:     s.api.NetworkName,
 	}
 }

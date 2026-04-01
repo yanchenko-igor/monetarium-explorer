@@ -2526,7 +2526,7 @@ func (exp *explorerUI) commonData(r *http.Request) *CommonPageData {
 	}
 	darkMode, err := r.Cookie(darkModeCoookie)
 	if err != nil && err != http.ErrNoCookie {
-		log.Errorf("Cookie dcrdataDarkBG retrieval error: %v", err)
+		log.Errorf("Cookie monetariumDarkBG retrieval error: %v", err)
 	}
 
 	scheme := r.URL.Scheme

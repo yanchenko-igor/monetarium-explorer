@@ -37,7 +37,7 @@ var (
 	zeroHashStringBytes = []byte(chainhash.Hash{}.String())
 )
 
-var CoinbaseFlags = "/dcrd/"
+var CoinbaseFlags = "/monetarium-node/"
 var CoinbaseScript = append([]byte{0x00, 0x00}, []byte(CoinbaseFlags)...)
 
 const (

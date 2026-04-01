@@ -526,7 +526,7 @@ type HomeInfo struct {
 	NBlockSubsidy         BlockSubsidy             `json:"subsidy"`
 	Params                ChainParams              `json:"params"`
 	PoolInfo              TicketPoolInfo           `json:"pool_info"`
-	TotalLockedDCR        float64                  `json:"total_locked_dcr"`
+	TotalLockedVAR        float64                  `json:"total_locked_var"`
 	HashRate              float64                  `json:"hash_rate"`
 	HashRateChangeDay     float64                  `json:"hash_rate_change_day"`
 	HashRateChangeMonth   float64                  `json:"hash_rate_change_month"`
