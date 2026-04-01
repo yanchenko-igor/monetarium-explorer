@@ -155,6 +155,15 @@
                                 <div class="tx-gauge tx-ticket" data-homepage-target="mpTicketBar"></div>
                                 <div class="tx-gauge tx-rev" data-homepage-target="mpRevBar"></div>
                                 <div class="tx-gauge tx-vote rounded-end" data-homepage-target="mpVoteBar"></div>
+                                {{- if .Mempool.CoinFills}}
+                                <div class="mt-1 d-flex" style="gap:4px">
+                                    {{- range .Mempool.CoinFills}}
+                                    <div style="flex:1;background:#eee;height:8px;border-radius:3px;overflow:hidden" title="{{.Symbol}}">
+                                        <div style="width:{{printf "%.1f" (mulf .FillPct 100.0)}}%;height:100%;background:{{.Color}}"></div>
+                                    </div>
+                                    {{- end}}
+                                </div>
+                                {{- end}}
                             </div>
 
                             <div class="d-flex justify-content-between align-items-center mx-auto px-2">
@@ -290,7 +299,7 @@
                             </div>
                         </div>
                         <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
-                            <div class="fs13 text-secondary">Vote Reward</div>
+                            <div class="fs13 text-secondary">Vote VAR Reward</div>
                             <div class="mono lh1rem fs14-decimal fs24 pt-1 pb-1 d-flex align-items-baseline">
                                 <span data-homepage-target="bsubsidyPos">
                                     {{template "decimalParts" (float64AsDecimalParts (toFloat64Amount (divide .NBlockSubsidy.PoS 5)) 8 true 2)}}
@@ -342,7 +351,7 @@
                             </div>
                         </div>
                         <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
-                            <div class="fs13 text-secondary">PoW Reward</div>
+                            <div class="fs13 text-secondary">PoW VAR Reward</div>
                             <div class="mono lh1rem p03rem0 fs14-decimal fs24 p03rem0 d-flex align-items-baseline">
                                 <span data-homepage-target="bsubsidyPow">{{template "decimalParts" (float64AsDecimalParts (toFloat64Amount .NBlockSubsidy.PoW) 8 true 2)}}</span>
                                 <span class="ps-1 unit lh15rem">DCR</span>
@@ -385,11 +394,11 @@
                 <div class="bg-white mb-1 p-2 px-3 mx-1 flex-grow-1">
                     <div class="my-3 h4">
                         <span class="dcricon-tree d-inline-block pe-2 h4"></span>
-                        Distribution
+                        Supply
                     </div>
                     <div class="row mt-1">
                         <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
-                            <div class="fs13 text-secondary"><a href="/treasury">Treasury</a></div>
+                            <div class="fs13 text-secondary">VAR Circulating Supply</div>
                             <div class="mono lh1rem fs14-decimal fs24 p03rem0 d-flex align-items-baseline">
                                 <span data-homepage-target="devFund">
                                     {{template "decimalParts" (float64AsDecimalParts (toFloat64Amount (add .DevFund .TreasuryBalance.Balance)) 0 true)}}

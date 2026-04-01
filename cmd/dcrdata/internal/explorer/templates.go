@@ -368,6 +368,9 @@ func makeTemplateFuncMap(params *chaincfg.Params) template.FuncMap {
 		"multiply": func(a, b int64) int64 {
 			return a * b
 		},
+		"mulf": func(a, b float64) float64 {
+			return a * b
+		},
 		"intMultiply": func(a, b int) int {
 			return a * b
 		},

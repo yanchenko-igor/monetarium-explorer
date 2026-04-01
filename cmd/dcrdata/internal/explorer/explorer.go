@@ -448,6 +448,15 @@ func (exp *explorerUI) MempoolSignal() chan<- pstypes.HubMessage {
 // []types.MempoolTx so that it may be modified (e.g. sorted) without affecting
 // other MempoolDataSavers.
 func (exp *explorerUI) StoreMPData(_ *mempool.StakeData, _ []types.MempoolTx, inv *types.MempoolInfo) {
+	// Compute per-coin fill bars. VAR occupies 10% of the bar; SKA types share
+	// the remaining 90%. Fill = min(size/maxBlockSize, 1.0).
+	const maxBlockSize = 393216.0
+	varFill := math.Min(float64(inv.LikelyMineable.Size)/maxBlockSize, 1.0)
+	inv.CoinFills = []types.CoinFillData{
+		{Symbol: "VAR", FillPct: varFill * 0.10, Color: fillColor(varFill)},
+	}
+	// SKA fills are zero until per-coin mempool tracking is implemented.
+
 	// Get exclusive access to the Mempool field.
 	exp.invsMtx.Lock()
 	exp.invs = inv
@@ -916,4 +925,15 @@ func generateRandomString() string {
 		bytes[i] = letters[num.Int64()]
 	}
 	return string(bytes)
+}
+
+// fillColor returns "green", "yellow", or "red" based on fill fraction.
+// green: fits in guaranteed space (<= 1.0), yellow: borrowed space, red: won't fit.
+func fillColor(fill float64) string {
+	if fill <= 1.0 {
+		return "green"
+	} else if fill <= 1.5 {
+		return "yellow"
+	}
+	return "red"
 }
