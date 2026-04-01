@@ -483,14 +483,22 @@ func (iapi *InsightApi) getAddressesTxnOutput(w http.ResponseWriter, r *http.Req
 
 				txOut := fundingTx.Tx.TxOut[f.Index]
 
+				// Insight API Amount/Satoshis are VAR-only; SKA outputs have Value=0.
+				var outAmount float64
+				var outSatoshis int64
+				if txOut.CoinType == 0 { // cointype.CoinTypeVAR
+					outAmount = dcrutil.Amount(txOut.Value).ToCoin()
+					outSatoshis = txOut.Value
+				}
+
 				txnOutputs = append(txnOutputs, &apitypes.AddressTxnOutput{
 					Address:       address,
 					TxnID:         fundingTx.Hash().String(),
 					Vout:          f.Index,
 					BlockTime:     fundingTx.MemPoolTime,
 					ScriptPubKey:  txOut.PkScript,
-					Amount:        dcrutil.Amount(txOut.Value).ToCoin(),
-					Satoshis:      txOut.Value,
+					Amount:        outAmount,
+					Satoshis:      outSatoshis,
 					Confirmations: 0,
 				})
 			}

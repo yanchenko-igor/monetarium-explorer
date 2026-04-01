@@ -180,7 +180,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
-	github.com/monetarium/monetarium-node/cointype v1.0.11 // indirect
+	github.com/monetarium/monetarium-node/cointype v1.0.14 // indirect
 	github.com/monetarium/monetarium-node/crypto/blake256 v1.0.14 // indirect
 	github.com/monetarium/monetarium-node/crypto/rand v1.0.14 // indirect
 	github.com/monetarium/monetarium-node/crypto/ripemd160 v1.0.14 // indirect
