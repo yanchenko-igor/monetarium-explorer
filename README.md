@@ -70,16 +70,18 @@ Monetarium Explorer is a block explorer for the [Monetarium](https://monetarium.
 
 ### 1. Bundle static web assets
 
-sh
+```sh
 cd cmd/dcrdata
 npm clean-install
 npm run build
+```
 
 ### 2. Build the executable
 
-sh
+```sh
 cd cmd/dcrdata
 go build -o monetarium-explorer .
+```
 
 The `public` and `views` folders must remain in the same directory as the `monetarium-explorer` binary.
 
@@ -97,7 +99,7 @@ The `public` and `views` folders must remain in the same directory as the `monet
 
 ### Step 1: Start monetarium-node on testnet3
 
-Create `~/.monetarium-node/monetarium-node.conf`:
+Create `~/.monetarium-node/monetarium-node.conf`: (macOS: ~/Library/Application Support/Monetarium/)
 
 ```ini
 testnet=1
@@ -127,7 +129,7 @@ createdb -O monetarium_testnet monetarium_testnet
 ### Step 3: Configure monetarium-explorer
 
 ```sh
-mkdir -p ~/.monetarium-explorer
+mkdir -p ~/.monetarium-explorer # # macOS: ~/Library/Application\ Support/Monetarium-explorer
 cp cmd/dcrdata/sample-dcrdata.conf ~/.monetarium-explorer/monetarium-explorer.conf
 ```
 
