@@ -9,14 +9,14 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/monetarium/monetarium-node/blockchain/stake v1.0.14
 	github.com/monetarium/monetarium-node/blockchain/standalone v1.0.14
-	github.com/monetarium/monetarium-node/chaincfg v1.0.14
-	github.com/monetarium/monetarium-node/chaincfg/chainhash v1.0.14
-	github.com/monetarium/monetarium-node/database v1.0.14
-	github.com/monetarium/monetarium-node/dcrutil v1.0.14
-	github.com/monetarium/monetarium-node/rpc/jsonrpc/types v1.0.14
-	github.com/monetarium/monetarium-node/rpcclient v1.0.14
-	github.com/monetarium/monetarium-node/txscript v1.0.14
-	github.com/monetarium/monetarium-node/wire v1.0.14
+	github.com/monetarium/monetarium-node/chaincfg v1.1.0
+	github.com/monetarium/monetarium-node/chaincfg/chainhash v1.1.0
+	github.com/monetarium/monetarium-node/database v1.1.0
+	github.com/monetarium/monetarium-node/dcrutil v1.1.0
+	github.com/monetarium/monetarium-node/rpc/jsonrpc/types v1.1.0
+	github.com/monetarium/monetarium-node/rpcclient v1.1.0
+	github.com/monetarium/monetarium-node/txscript v1.1.0
+	github.com/monetarium/monetarium-node/wire v1.1.0
 	golang.org/x/net v0.25.0
 )
 

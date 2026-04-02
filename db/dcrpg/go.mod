@@ -14,14 +14,14 @@ require (
 	github.com/monetarium/monetarium-explorer v0.0.0
 	github.com/monetarium/monetarium-node/blockchain/stake v1.0.14
 	github.com/monetarium/monetarium-node/blockchain/standalone v1.0.14
-	github.com/monetarium/monetarium-node/chaincfg v1.0.14
-	github.com/monetarium/monetarium-node/chaincfg/chainhash v1.0.14
+	github.com/monetarium/monetarium-node/chaincfg v1.1.0
+	github.com/monetarium/monetarium-node/chaincfg/chainhash v1.1.0
 	github.com/monetarium/monetarium-node/dcrec/secp256k1 v1.0.14
-	github.com/monetarium/monetarium-node/dcrutil v1.0.14
-	github.com/monetarium/monetarium-node/rpc/jsonrpc/types v1.0.14
-	github.com/monetarium/monetarium-node/rpcclient v1.0.14
-	github.com/monetarium/monetarium-node/txscript v1.0.14
-	github.com/monetarium/monetarium-node/wire v1.0.14
+	github.com/monetarium/monetarium-node/dcrutil v1.1.0
+	github.com/monetarium/monetarium-node/rpc/jsonrpc/types v1.1.0
+	github.com/monetarium/monetarium-node/rpcclient v1.1.0
+	github.com/monetarium/monetarium-node/txscript v1.1.0
+	github.com/monetarium/monetarium-node/wire v1.1.0
 )
 
 require (
@@ -42,7 +42,7 @@ require (
 	github.com/monetarium/monetarium-node/crypto/blake256 v1.0.14 // indirect
 	github.com/monetarium/monetarium-node/crypto/rand v1.0.14 // indirect
 	github.com/monetarium/monetarium-node/crypto/ripemd160 v1.0.14 // indirect
-	github.com/monetarium/monetarium-node/database v1.0.14 // indirect
+	github.com/monetarium/monetarium-node/database v1.1.0 // indirect
 	github.com/monetarium/monetarium-node/dcrec v1.0.14 // indirect
 	github.com/monetarium/monetarium-node/dcrec/edwards v1.0.14 // indirect
 	github.com/monetarium/monetarium-node/dcrjson v1.0.14 // indirect

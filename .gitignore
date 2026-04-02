@@ -5,6 +5,7 @@
 *.bak
 .idea/
 /dcrdata
+__debug_bin*
 debug
 *.cert
 *.key
