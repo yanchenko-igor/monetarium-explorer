@@ -150,7 +150,6 @@ func _main(ctx context.Context) error {
 		return fmt.Errorf("expected network %s, got %s", activeNet.Net, curnet)
 	}
 
-
 	// Wrap the rpcclient to satisfy the TransactionPromiseGetter and
 	// VerboseTransactionPromiseGetter interfaces in txhelpers. Both stakedb and
 	// mempool packages use this rather than require an actual rpcclient.Client.
