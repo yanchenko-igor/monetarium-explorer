@@ -44,6 +44,30 @@ func blockCoinAmounts(msgBlock *wire.MsgBlock) map[uint8]string {
 	return result
 }
 
+// blockCoinTxStats returns per-coin tx count and total serialized size for all
+// transactions in a block (key 0=VAR, 1-255=SKA-n). Returns nil for empty blocks.
+func blockCoinTxStats(msgBlock *wire.MsgBlock) map[uint8]CoinTxStats {
+	stats := make(map[uint8]CoinTxStats)
+	allTxs := append(msgBlock.Transactions, msgBlock.STransactions...)
+	for _, tx := range allTxs {
+		ct := uint8(cointype.CoinTypeVAR)
+		for _, out := range tx.TxOut {
+			if out.CoinType.IsSKA() {
+				ct = uint8(out.CoinType)
+				break
+			}
+		}
+		s := stats[ct]
+		s.TxCount++
+		s.Size += uint32(tx.SerializeSize())
+		stats[ct] = s
+	}
+	if len(stats) == 0 {
+		return nil
+	}
+	return stats
+}
+
 // MsgBlockToDBBlock creates a dbtypes.Block from a wire.MsgBlock
 func MsgBlockToDBBlock(msgBlock *wire.MsgBlock, chainParams *chaincfg.Params, chainWork string, winners []ChainHash) *Block {
 	// Create the dbtypes.Block structure
@@ -74,6 +98,7 @@ func MsgBlockToDBBlock(msgBlock *wire.MsgBlock, chainParams *chaincfg.Params, ch
 		ChainWork:    chainWork,
 		Winners:      winners,
 		CoinAmounts:  blockCoinAmounts(msgBlock),
+		CoinTxStats:  blockCoinTxStats(msgBlock),
 	}
 }
 

@@ -5930,7 +5930,7 @@ func (pgb *ChainDB) GetExplorerBlock(ctx context.Context, hash string) *exptypes
 		block.CoinAmounts = summary.CoinAmounts
 		// Also populate CoinRows on the embedded BlockBasic so the websocket
 		// path (which sends BlockInfo) carries coin_rows for the frontend.
-		block.BlockBasic.CoinRows = coinRowsFromAmounts(summary.CoinAmounts)
+		block.BlockBasic.CoinRows = coinRowsFromSummary(summary)
 	}
 
 	if data.PoWHash != "" {
