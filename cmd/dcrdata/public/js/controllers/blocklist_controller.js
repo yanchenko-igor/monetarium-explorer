@@ -25,13 +25,13 @@ function coinRowsToSKAData(block) {
   for (const cr of coinRows) {
     if (cr.coin_type === 0) {
       varTxCount = cr.tx_count
-      varAmount = cr.amount
+      varAmount = humanize.formatCoinAtoms(cr.amount, cr.coin_type)
       varSize = `${cr.size} B`
     } else {
       subRows.push({
         tokenType: cr.symbol,
         txCount: String(cr.tx_count),
-        amount: cr.amount,
+        amount: humanize.formatCoinAtoms(cr.amount, cr.coin_type),
         size: `${cr.size} B`
       })
     }
