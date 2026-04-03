@@ -2164,21 +2164,21 @@ type Block struct {
 	TxDbIDs      []uint64
 	NumStakeTx   uint32
 	STxDbIDs     []uint64
-	Time         TimeDef          `json:"time"`
-	Nonce        uint64           `json:"nonce"`
-	VoteBits     uint16           `json:"votebits"`
-	Voters       uint16           `json:"voters"`
-	FreshStake   uint8            `json:"freshstake"`
-	Revocations  uint8            `json:"revocations"`
-	PoolSize     uint32           `json:"poolsize"`
-	Bits         uint32           `json:"bits"`
-	SBits        uint64           `json:"sbits"`
-	Difficulty   float64          `json:"difficulty"`
-	StakeVersion uint32           `json:"stakeversion"`
-	PreviousHash ChainHash        `json:"previousblockhash"`
-	ChainWork    string           `json:"chainwork"`
-	Winners      []ChainHash      `json:"winners"`
-	CoinAmounts  map[uint8]string `json:"coin_amounts,omitempty"`
+	Time         TimeDef               `json:"time"`
+	Nonce        uint64                `json:"nonce"`
+	VoteBits     uint16                `json:"votebits"`
+	Voters       uint16                `json:"voters"`
+	FreshStake   uint8                 `json:"freshstake"`
+	Revocations  uint8                 `json:"revocations"`
+	PoolSize     uint32                `json:"poolsize"`
+	Bits         uint32                `json:"bits"`
+	SBits        uint64                `json:"sbits"`
+	Difficulty   float64               `json:"difficulty"`
+	StakeVersion uint32                `json:"stakeversion"`
+	PreviousHash ChainHash             `json:"previousblockhash"`
+	ChainWork    string                `json:"chainwork"`
+	Winners      []ChainHash           `json:"winners"`
+	CoinAmounts  map[uint8]string      `json:"coin_amounts,omitempty"`
 	CoinTxStats  map[uint8]CoinTxStats `json:"coin_tx_stats,omitempty"`
 }
 
