@@ -3,6 +3,7 @@ package explorer
 import (
 	"fmt"
 
+	humanize "github.com/dustin/go-humanize"
 	"github.com/monetarium/monetarium-explorer/explorer/types"
 )
 
@@ -66,7 +67,7 @@ func buildHomeBlockRows(blocks []*types.BlockBasic) []HomeBlockRow {
 					varTxCount = cr.TxCount
 					varAmount = formatCoinAtoms(cr.Amount, cr.CoinType)
 					if cr.Size > 0 {
-						varSize = fmt.Sprintf("%d B", cr.Size)
+						varSize = humanize.Bytes(uint64(cr.Size))
 					} else {
 						varSize = "—"
 					}
@@ -78,7 +79,7 @@ func buildHomeBlockRows(blocks []*types.BlockBasic) []HomeBlockRow {
 					}
 					size := "—"
 					if cr.Size > 0 {
-						size = fmt.Sprintf("%d B", cr.Size)
+						size = humanize.Bytes(uint64(cr.Size))
 					}
 					subRows = append(subRows, SKASubRow{
 						TokenType: cr.Symbol,

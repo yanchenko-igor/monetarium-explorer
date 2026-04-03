@@ -29,13 +29,13 @@ function coinRowsToSKAData(block) {
     if (cr.coin_type === 0) {
       varTxCount = cr.tx_count
       varAmount = humanize.formatCoinAtoms(cr.amount, cr.coin_type)
-      varSize = cr.size > 0 ? `${cr.size} B` : '—'
+      varSize = cr.size > 0 ? humanize.bytes(cr.size) : '—'
     } else {
       subRows.push({
         tokenType: cr.symbol,
         txCount: cr.tx_count > 0 ? String(cr.tx_count) : '—',
         amount: humanize.formatCoinAtoms(cr.amount, cr.coin_type),
-        size: cr.size > 0 ? `${cr.size} B` : '—'
+        size: cr.size > 0 ? humanize.bytes(cr.size) : '—'
       })
     }
   }
