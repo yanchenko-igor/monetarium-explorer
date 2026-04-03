@@ -1,7 +1,7 @@
 # Monetarium Explorer — Rewrite Plan
 
 ## Notes
-- **Every task is a separate commit.**
+- **Every task is a separate branch feature/name_of_the_feature.**
 - **Frontend tasks (7, 8): bare minimum for compatibility only — no polish.**
 
 ---
@@ -903,5 +903,44 @@ Test: Add a case to cmd/dcrdata/internal/api/apiroutes_test.go that constructs a
 resulting apitypes.Vout has CoinType == 1 and SKAValue != "".
 
 Demo: GET /api/tx/{ska-tx-id} returns vouts with "coin_type": 1 and "ska_value": "900000000000000000000000000000000" instead of "value": 0.
+
+Task 18: Per-coin tx count and size in the blocks table
+Commit: feat: persist per-coin tx count and size in blocks table
+
+Objective: Mirror the coin_amounts pattern to store per-coin transaction counts and total sizes, so the blocks table and API expose how many transactions and how many 
+bytes each coin type contributes per block.
+
+Status: Largely complete. One bug remains.
+
+What is already implemented:
+
+- blockdata/blockdata.go — blockCoinTxStats function and CollectBlockInfo wiring (CoinTxStats populated on both blockdata and extrainfo)
+- blockdata/blockdata_test.go — TestBlockCoinTxStats_Mixed and TestBlockCoinTxStats_Empty
+- db/dbtypes/types.go — CoinTxStats struct and DBBlock.CoinTxStats field
+- api/types/apitypes.go — CoinTxStats type alias; CoinTxStats field on BlockDataBasic and BlockExplorerExtraInfo
+- db/dcrpg/internal/blockstmts.go — coin_tx_stats JSONB column in CreateBlockTable; $27 in insertBlockRow; included in all SELECT statements alongside coin_amounts
+- db/dcrpg/queries.go — $27 arg (ToJSONB(dbBlock.CoinTxStats)) on insert; coinTxStatsJSON scanned and unmarshalled in retrieve functions
+- db/dcrpg/upgrades.go — ALTER TABLE blocks ADD COLUMN IF NOT EXISTS coin_tx_stats JSONB
+- db/dcrpg/internal/schema_test.go — column presence assertion
+- db/dcrpg/pgblockchain.go — coinRowsFromSummary merges CoinTxStats into CoinRowData (used by the block list path at line 6086)
+
+Remaining bug — pgblockchain.go line 5933:
+
+The BlockInfo path (used by the websocket and block detail page) calls coinRowsFromAmounts instead of coinRowsFromSummary, so TxCount and Size are always 0 in coin_rows 
+on that path:
+
+go
+// line 5933 — WRONG
+block.BlockBasic.CoinRows = coinRowsFromAmounts(summary.CoinAmounts)
+
+// fix
+block.BlockBasic.CoinRows = coinRowsFromSummary(summary)
+
+
+Test: Existing tests cover all other paths. Add one assertion to the BlockInfo path test (or the existing TestBuildHomeBlockRows_WithCoinRows) that a CoinRowData built 
+via the BlockInfo path has non-zero TxCount and Size when CoinTxStats is present.
+
+Demo: Block detail page and websocket block events show correct per-coin tx_count and size in coin_rows. GET /api/block/{height} returns 
+"coin_tx_stats": {"0": {"tx_count": 5, "size": 2048}, "1": {"tx_count": 2, "size": 512}}.
 
 
