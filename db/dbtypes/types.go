@@ -2039,6 +2039,7 @@ type VinTxProperty struct {
 	Sequence    uint32    `json:"sequence"`
 	ValueIn     int64     `json:"amountin"`
 	CoinType    uint8     `json:"coin_type"`
+	SKAValue    string    `json:"ska_value,omitempty"`
 	TxID        ChainHash `json:"tx_hash"`
 	TxIndex     uint32    `json:"tx_index"`
 	TxTree      uint16    `json:"tx_tree"`
@@ -2157,20 +2158,21 @@ type Block struct {
 	TxDbIDs      []uint64
 	NumStakeTx   uint32
 	STxDbIDs     []uint64
-	Time         TimeDef     `json:"time"`
-	Nonce        uint64      `json:"nonce"`
-	VoteBits     uint16      `json:"votebits"`
-	Voters       uint16      `json:"voters"`
-	FreshStake   uint8       `json:"freshstake"`
-	Revocations  uint8       `json:"revocations"`
-	PoolSize     uint32      `json:"poolsize"`
-	Bits         uint32      `json:"bits"`
-	SBits        uint64      `json:"sbits"`
-	Difficulty   float64     `json:"difficulty"`
-	StakeVersion uint32      `json:"stakeversion"`
-	PreviousHash ChainHash   `json:"previousblockhash"`
-	ChainWork    string      `json:"chainwork"`
-	Winners      []ChainHash `json:"winners"`
+	Time         TimeDef          `json:"time"`
+	Nonce        uint64           `json:"nonce"`
+	VoteBits     uint16           `json:"votebits"`
+	Voters       uint16           `json:"voters"`
+	FreshStake   uint8            `json:"freshstake"`
+	Revocations  uint8            `json:"revocations"`
+	PoolSize     uint32           `json:"poolsize"`
+	Bits         uint32           `json:"bits"`
+	SBits        uint64           `json:"sbits"`
+	Difficulty   float64          `json:"difficulty"`
+	StakeVersion uint32           `json:"stakeversion"`
+	PreviousHash ChainHash        `json:"previousblockhash"`
+	ChainWork    string           `json:"chainwork"`
+	Winners      []ChainHash      `json:"winners"`
+	CoinAmounts  map[uint8]string `json:"coin_amounts,omitempty"`
 }
 
 type BlockDataBasic struct {
@@ -2216,6 +2218,8 @@ type AddressTx struct {
 	MatchedTxIndex uint32
 	MergedTxnCount uint64 `json:",omitempty"`
 	BlockHeight    uint32
+	CoinType       uint8
+	SKAValue       string
 }
 
 // Link formats a link for the transaction, with vin/vout index if the AddressTx
@@ -2368,20 +2372,30 @@ func ReduceAddressHistory(addrHist []*AddressRow) (*AddressInfo, float64, float6
 
 		if addrOut.IsFunding {
 			// Funding transaction
-			received += int64(addrOut.Value)
-			tx.ReceivedTotal = coin
-			creditTxns = append(creditTxns, &tx)
-			if txType != "Regular" {
-				fromStake += int64(addrOut.Value)
+			if addrOut.CoinType == 0 {
+				received += int64(addrOut.Value)
+				tx.ReceivedTotal = coin
+				if txType != "Regular" {
+					fromStake += int64(addrOut.Value)
+				}
+			} else {
+				tx.SKAValue = addrOut.SKAValue
+				tx.CoinType = addrOut.CoinType
 			}
+			creditTxns = append(creditTxns, &tx)
 		} else {
 			// Spending transaction
-			sent += int64(addrOut.Value)
-			tx.SentTotal = coin
-			debitTxns = append(debitTxns, &tx)
-			if txType != "Regular" {
-				toStake += int64(addrOut.Value)
+			if addrOut.CoinType == 0 {
+				sent += int64(addrOut.Value)
+				tx.SentTotal = coin
+				if txType != "Regular" {
+					toStake += int64(addrOut.Value)
+				}
+			} else {
+				tx.SKAValue = addrOut.SKAValue
+				tx.CoinType = addrOut.CoinType
 			}
+			debitTxns = append(debitTxns, &tx)
 		}
 
 		transactions = append(transactions, &tx)

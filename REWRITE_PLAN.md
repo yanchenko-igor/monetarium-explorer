@@ -613,3 +613,295 @@ Test: go test ./cmd/dcrdata/... passes with zero failures.
 Demo: CI green on the cmd/dcrdata module step.
 
 
+### Task 14: Fix missing coin_type on vins in processTransactions
+Commit: fix: set coin_type on VinTxProperty in processTransactions
+
+Objective: Every vin stored in the vins table has coin_type = 0 (VAR) even when it spends an SKA output, because CoinType is never assigned when building VinTxProperty 
+in processTransactions. Fix it.
+
+Root cause:
+
+In db/dbtypes/extraction.go, the vin construction loop omits CoinType:
+
+go
+dbTxVins[txIndex] = append(dbTxVins[txIndex], VinTxProperty{
+    // ... all fields set ...
+    // CoinType never assigned → defaults to 0 (VAR)
+})
+
+
+The vout loop directly below it correctly reads ct := txout.CoinType. The wire TxIn type has no CoinType field — the coin type of an input is the coin type of the output
+it spends. Since the codebase already assumes transactions are single-coin (see the skaSpent placeholder comment), the tx's coin type can be derived from its outputs.
+
+Fix — db/dbtypes/extraction.go:
+
+Before the vin loop, derive the transaction's coin type from its outputs (reusing the already-computed skaSent map):
+
+go
+// Derive vin coin type from outputs (tx is single-coin).
+vinCoinType := uint8(cointype.CoinTypeVAR)
+for ct := range skaSent {
+    vinCoinType = ct
+    break
+}
+
+
+Then set it in the VinTxProperty literal:
+
+go
+dbTxVins[txIndex] = append(dbTxVins[txIndex], VinTxProperty{
+    // ... existing fields ...
+    CoinType: vinCoinType,
+})
+
+
+No other files need changes — insertVinsStmt in queries.go already passes vin.CoinType as $8 to the SQL statement.
+
+Test: Add a case to db/dbtypes/extraction_test.go Test_processTransactions with a synthetic SKA-1 transaction (one TxIn with SKAValueIn set, one TxOut with CoinType=1). 
+Assert that the resulting VinTxProperty.CoinType == 1.
+
+Demo: After re-syncing, SELECT count(*) FROM vins WHERE coin_type != 0 returns a non-zero count matching the number of SKA inputs in the chain.
+
+
+> ### Task 15: Persist coin_amounts to the blocks table
+Commit: fix: persist coin_amounts in blocks table so SKA data survives restart
+
+Objective: CoinAmounts is computed at sync time and cached in memory, but never written to the DB. After a restart the cache is cold, retrieveBlockSummaryByHash returns 
+CoinAmounts == nil, and no SKA data appears in the UI. Fix by adding a coin_amounts JSONB column to blocks and round-tripping it through all affected insert/select 
+paths.
+
+db/dcrpg/internal/blockstmts.go:
+
+Add column to CreateBlockTable:
+sql
+coin_amounts JSONB
+
+
+Add to insertBlockRow (becomes $26):
+sql
+INSERT INTO blocks (..., coin_amounts) VALUES (..., $26)
+
+
+Add to SelectBlockDataByHash and SelectBlockDataByHeight SELECT lists:
+sql
+, blocks.coin_amounts
+
+
+db/dcrpg/queries.go — wherever insertBlockRow is executed, pass the new arg:
+go
+dbtypes.ToJSONB(blockSummary.CoinAmounts)  // $26
+
+
+In retrieveBlockSummaryByHash and retrieveBlockSummary, scan the new column and unmarshal:
+go
+var coinAmountsJSON []byte
+// add &coinAmountsJSON to the Scan call
+_ = json.Unmarshal(coinAmountsJSON, &bd.CoinAmounts)
+
+
+Do the same in retrieveBlockSummaryRange / retrieveBlockSummaryRangeStepped if they use the same SELECT.
+
+db/dcrpg/upgrades.go:
+sql
+ALTER TABLE blocks ADD COLUMN IF NOT EXISTS coin_amounts JSONB;
+
+
+Test: After a full restart with a cold cache, GET /api/block/{height} for a block containing SKA outputs must return a non-nil coin_amounts field. Assert in the existing
+TestGetBlockSummary_CoinAmounts handler test that the value survives a round-trip through json.Marshal → json.Unmarshal (i.e. no float64 precision loss on the atom 
+strings).
+
+Demo: Restart the explorer against a synced DB; the homepage latest-blocks table shows SKA-1 rows without requiring a re-sync.
+
+> ### Task 16: Display SKA amounts on transaction and address pages
+Commit: fix: display SKA amounts on tx and address pages
+
+Objective: Six display bugs cause SKA amounts to show as 0 on the transaction and address pages. All stem from the same root: Value int64 is 0 for SKA outputs/inputs; 
+the real amount lives in SKAValue string. The display layer never reads it.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+explorer/types/explorertypes.go — extend Vout and AddressTx:
+
+go
+type Vout struct {
+    // ... existing fields ...
+    CoinType        uint8
+    SKAValue        string // raw atom string for SKA outputs; empty for VAR
+    FormattedAmount string // already exists; set correctly for both coin types
+}
+
+type AddressTx struct {
+    // ... existing fields ...
+    CoinType      uint8
+    SKAValue      string // raw atom string; empty for VAR
+}
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+cmd/dcrdata/internal/explorer/explorerroutes.go — vout loop:
+
+Replace:
+go
+amount := dcrutil.Amount(int64(vouts[iv].Value)).ToCoin()
+tx.Vout = append(tx.Vout, types.Vout{
+    Amount:          amount,
+    FormattedAmount: humanize.Commaf(amount),
+    ...
+})
+
+With:
+go
+vout := types.Vout{
+    Addresses: vouts[iv].ScriptPubKeyData.Addresses,
+    Type:      vouts[iv].ScriptPubKeyData.Type.String(),
+    Spent:     spendingTx != "",
+    Index:     vouts[iv].TxIndex,
+    Version:   vouts[iv].Version,
+    CoinType:  vouts[iv].CoinType,
+    SKAValue:  vouts[iv].SKAValue,
+}
+if vouts[iv].CoinType == 0 {
+    amount := dcrutil.Amount(int64(vouts[iv].Value)).ToCoin()
+    vout.Amount = amount
+    vout.FormattedAmount = humanize.Commaf(amount)
+} else {
+    vout.FormattedAmount = exptypes.FormatSKAAmount(vouts[iv].SKAValue, vouts[iv].CoinType, true)
+}
+tx.Vout = append(tx.Vout, vout)
+
+
+vin loop — replace:
+go
+amount := dcrutil.Amount(vins[iv].ValueIn).ToCoin()
+// ...
+AmountIn:      amount,
+// ...
+FormattedAmount: humanize.Commaf(amount),
+
+With:
+go
+var formattedAmt string
+var amountIn float64
+if vins[iv].CoinType == 0 {
+    amountIn = dcrutil.Amount(vins[iv].ValueIn).ToCoin()
+    formattedAmt = humanize.Commaf(amountIn)
+} else {
+    formattedAmt = exptypes.FormatSKAAmount(/* need SKAValue on VinTxProperty — see below */)
+}
+
+
+This requires adding SKAValue string to dbtypes.VinTxProperty (currently missing — vins store ValueIn int64 which is 0 for SKA). Populate it in processTransactions 
+alongside CoinType:
+go
+// in the vin loop in extraction.go
+SKAValue: func() string {
+    if vinCoinType != 0 {
+        // sum SKAValueIn from this input
+        if txin.SKAValueIn != nil {
+            return txin.SKAValueIn.String()
+        }
+    }
+    return ""
+}(),
+
+And add ska_value TEXT to the vins INSERT statement + SelectAllVinInfoByID SELECT (mirrors the vouts pattern).
+
+TxBasic.Total — set from dbTx0.Sent (VAR only). Add a SKASent map[uint8]string field to TxBasic and populate from dbTx0.SentByCoin:
+go
+TxBasic: &types.TxBasic{
+    Total:   dcrutil.Amount(dbTx0.Sent).ToCoin(), // VAR
+    SKASent: dbTx0.SentByCoin,                    // SKA
+    ...
+}
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+db/dbtypes/types.go — ReduceAddressHistory:
+
+Replace:
+go
+coin := dcrutil.Amount(addrOut.Value).ToCoin()
+tx.ReceivedTotal = coin  // or SentTotal
+
+With:
+go
+if addrOut.CoinType == 0 {
+    coin := dcrutil.Amount(addrOut.Value).ToCoin()
+    if addrOut.IsFunding { tx.ReceivedTotal = coin } else { tx.SentTotal = coin }
+} else {
+    tx.SKAValue = addrOut.SKAValue
+    tx.CoinType = addrOut.CoinType
+}
+
+
+Also skip SKA rows in the VAR-only received/sent int64 accumulators (they're already 0 but make it explicit with a CoinType == 0 guard).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+Test: Add cases to db/dbtypes/extraction_test.go asserting that a SKA-1 vout produces SKAValue != "" and Value == 0. Add a ReduceAddressHistory test with a SKA 
+AddressRow (CoinType=1, Value=0, SKAValue="1000000000000000000") asserting tx.SKAValue == "1000000000000000000" and tx.ReceivedTotal == 0.
+
+Demo: Navigate to a transaction with SKA-1 outputs — vout amounts show the correct SKA-1 value instead of 0. Navigate to the receiving address — the transaction row 
+shows the SKA-1 amount.
+
+
+### Task 17: Add coin_type and ska_value to API vout responses
+Commit: fix: expose coin_type and ska_value on API vout responses
+
+Objective: GET /api/tx/{txid} returns value: 0 for SKA outputs with no coin type indicator. The node RPC response carries the SKA amount in a separate field on 
+chainjson.Vout; the explorer never reads it. Fix by extending apitypes.Vout and populating it in GetAPITransaction and GetAllTxOut.
+
+api/types/apitypes.go — extend Vout:
+
+go
+type Vout struct {
+    Value               float64      `json:"value"`
+    N                   uint32       `json:"n"`
+    Version             uint16       `json:"version"`
+    ScriptPubKeyDecoded ScriptPubKey `json:"scriptPubKey"`
+    Spend               *TxInputID   `json:"spend,omitempty"`
+    CoinType            uint8        `json:"coin_type,omitempty"`
+    SKAValue            string       `json:"ska_value,omitempty"` // decimal atom string
+}
+
+
+db/dcrpg/pgblockchain.go — GetAPITransaction vout loop:
+
+Check what field chainjson.Vout uses for SKA (it will be something like SKAValue *string or SKAAmount string — confirm from the node's jsonrpc types). Then populate:
+
+go
+tx.Vout[i].Value = vout.Value
+tx.Vout[i].CoinType = uint8(vout.CoinType)   // from chainjson.Vout
+if vout.SKAValue != nil {
+    tx.Vout[i].SKAValue = *vout.SKAValue      // field name TBD from chainjson
+}
+
+
+Apply the same two lines in GetAllTxOut:
+go
+allTxOut = append(allTxOut, &apitypes.TxOut{
+    Value:    txouts[i].Value,
+    Version:  txouts[i].Version,
+    CoinType: uint8(txouts[i].CoinType),
+    SKAValue: ...,
+    ...
+})
+
+
+Note: apitypes.TxOut also needs the same two fields added.
+
+First step: grep chainjson.Vout in the monetarium-node module to find the exact field names for coin type and SKA value on the RPC result struct, then use those names 
+above.
+
+Test: Add a case to cmd/dcrdata/internal/api/apiroutes_test.go that constructs a mock chainjson.GetRawTransactionVerboseResult with a SKA-1 vout and asserts the 
+resulting apitypes.Vout has CoinType == 1 and SKAValue != "".
+
+Demo: GET /api/tx/{ska-tx-id} returns vouts with "coin_type": 1 and "ska_value": "900000000000000000000000000000000" instead of "value": 0.
+
+
