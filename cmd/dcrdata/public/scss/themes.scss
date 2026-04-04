@@ -216,4 +216,10 @@ body.darkBG {
   .link-button:active {
     color: $dark-link-hover-color;
   }
+
+  .ska-sub-row--visible td:first-child {
+    box-shadow:
+      inset 3px 0 0 0 #4a5568,
+      inset 0 0 0 9999px var(--bs-table-accent-bg);
+  }
 }

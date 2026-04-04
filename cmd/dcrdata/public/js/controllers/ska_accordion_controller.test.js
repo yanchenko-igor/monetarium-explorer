@@ -203,3 +203,67 @@ describe('ska_accordion_controller — property tests', () => {
     )
   })
 })
+
+// ---------------------------------------------------------------------------
+// Feature: home-block-table-hierarchy
+// Task 8.1 — Unit tests for Property 2: chevron state reflects expansion
+// ---------------------------------------------------------------------------
+
+describe('ska_accordion_controller — home-block-table-hierarchy chevron state tests', () => {
+  describe('Property 2: chevron state reflects expansion', () => {
+    it('block row gains is-expanded after toggle()', () => {
+      const { blockRow, ctrl } = buildDOM(42, 2)
+      clickRow(blockRow, ctrl)
+      expect(blockRow.classList.contains('is-expanded')).toBe(true)
+    })
+
+    it('block row loses is-expanded after second toggle()', () => {
+      const { blockRow, ctrl } = buildDOM(42, 2)
+      clickRow(blockRow, ctrl)
+      clickRow(blockRow, ctrl)
+      expect(blockRow.classList.contains('is-expanded')).toBe(false)
+    })
+
+    it('is-expanded is absent before any toggle', () => {
+      const { blockRow } = buildDOM(42, 2)
+      expect(blockRow.classList.contains('is-expanded')).toBe(false)
+    })
+
+    it('is-expanded is absent when there are no sub-rows', () => {
+      const { blockRow, ctrl } = buildDOM(42, 0)
+      clickRow(blockRow, ctrl)
+      expect(blockRow.classList.contains('is-expanded')).toBe(false)
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Feature: home-block-table-hierarchy, Property 2: Chevron state reflects expansion (round-trip)
+// Task 8.2 (optional) — extend round-trip property test to assert is-expanded
+// ---------------------------------------------------------------------------
+
+describe('ska_accordion_controller — home-block-table-hierarchy property 2 round-trip', () => {
+  // Feature: home-block-table-hierarchy, Property 2: Chevron state reflects expansion
+  it('Property 2: is-expanded absent after two toggles for any blockId', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 999999 }), (blockId) => {
+        const { blockRow, subRows, ctrl } = buildDOM(blockId, 2)
+
+        const initialSubRowClasses = subRows.map((r) => r.className)
+        const initialBlockRowClass = blockRow.className
+
+        // Expand
+        clickRow(blockRow, ctrl)
+        expect(blockRow.classList.contains('is-expanded')).toBe(true)
+
+        // Collapse
+        clickRow(blockRow, ctrl)
+        expect(blockRow.classList.contains('is-expanded')).toBe(false)
+
+        // Full round-trip: all classes restored
+        subRows.forEach((r, i) => expect(r.className).toBe(initialSubRowClasses[i]))
+        expect(blockRow.className).toBe(initialBlockRowClass)
+      })
+    )
+  })
+})

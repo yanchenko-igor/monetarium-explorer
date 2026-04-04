@@ -45,6 +45,12 @@ function appendBlock(tbody, height, skaCoinRows = []) {
     const td = document.createElement('td')
     td.dataset.type = dt
     if (dt === 'height') td.className = 'text-start ps-1'
+    if (dt === 'size') {
+      td.className = 'text-end num d-none d-sm-table-cell d-md-none d-lg-table-cell'
+    }
+    if (dt === 'revocations') {
+      td.className = 'text-end num d-none d-sm-table-cell d-md-none d-lg-table-cell'
+    }
     blockRow.appendChild(td)
   }
   tbody.appendChild(blockRow)
@@ -263,7 +269,7 @@ describe('blocklist_controller — Property 8: WebSocket block prepend matches s
       const row = tbody.querySelector(
         'tr[data-block-id="1001"][data-ska-accordion-target="blockRow"]'
       )
-      const labelCell = row.nextElementSibling.querySelector('td.text-start')
+      const labelCell = row.nextElementSibling.querySelector('td.text-end')
       expect(labelCell).not.toBeNull()
       expect(labelCell.textContent.trim()).toBe('VAR')
     })
@@ -307,7 +313,7 @@ describe('blocklist_controller — Property 8: WebSocket block prepend matches s
       ).slice(1) // skip VAR row
       subs.forEach((r) => {
         expect(r.querySelectorAll('td').length).toBe(9)
-        const label = r.querySelector('td.text-start')
+        const label = r.querySelector('td.text-end')
         expect(label).not.toBeNull()
         expect(label.textContent.trim()).toMatch(/^SKA-\d+$/)
       })
@@ -398,6 +404,468 @@ describe('blocklist_controller — Property 8: WebSocket block prepend matches s
               expect(all[i].dataset.blockId).toBe(String(height))
             }
           }
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Feature: home-block-table-hierarchy
+// Task 7.1 — Unit tests for badge/anchor structural output
+// ---------------------------------------------------------------------------
+
+describe('blocklist_controller — home-block-table-hierarchy badge & anchor unit tests', () => {
+  describe('VAR sub-row badge structure', () => {
+    it('label cell has class text-end', () => {
+      const { tbody, ctrl } = buildTable(1000, 1, SKA_ROWS_3)
+      ctrl._processBlock(makeBlock(1001, { skaCoinRows: SKA_ROWS_3 }))
+      const blockRow = tbody.querySelector(
+        'tr[data-block-id="1001"][data-ska-accordion-target="blockRow"]'
+      )
+      const varRow = blockRow.nextElementSibling
+      const labelCell = varRow.querySelector('td[data-type="sub-label"]')
+      expect(labelCell).not.toBeNull()
+      expect(labelCell.classList.contains('text-end')).toBe(true)
+    })
+
+    it('label cell contains a span with coin-label, coin-label--var classes', () => {
+      const { tbody, ctrl } = buildTable(1000, 1, SKA_ROWS_3)
+      ctrl._processBlock(makeBlock(1001, { skaCoinRows: SKA_ROWS_3 }))
+      const blockRow = tbody.querySelector(
+        'tr[data-block-id="1001"][data-ska-accordion-target="blockRow"]'
+      )
+      const varRow = blockRow.nextElementSibling
+      const badge = varRow.querySelector(
+        'td[data-type="sub-label"] span.coin-label.coin-label--var'
+      )
+      expect(badge).not.toBeNull()
+      expect(badge.textContent).toBe('VAR')
+    })
+
+    it('VAR sub-row has exactly 9 td elements', () => {
+      const { tbody, ctrl } = buildTable(1000, 1, SKA_ROWS_3)
+      ctrl._processBlock(makeBlock(1001, { skaCoinRows: SKA_ROWS_3 }))
+      const blockRow = tbody.querySelector(
+        'tr[data-block-id="1001"][data-ska-accordion-target="blockRow"]'
+      )
+      expect(blockRow.nextElementSibling.querySelectorAll('td').length).toBe(9)
+    })
+
+    it('VAR sub-row col-5 and col-8 have responsive classes', () => {
+      const { tbody, ctrl } = buildTable(1000, 1, SKA_ROWS_3)
+      ctrl._processBlock(makeBlock(1001, { skaCoinRows: SKA_ROWS_3 }))
+      const blockRow = tbody.querySelector(
+        'tr[data-block-id="1001"][data-ska-accordion-target="blockRow"]'
+      )
+      const cells = Array.from(blockRow.nextElementSibling.querySelectorAll('td'))
+      const responsiveClasses = ['d-none', 'd-sm-table-cell', 'd-md-none', 'd-lg-table-cell']
+      responsiveClasses.forEach((cls) => {
+        expect(cells[4].classList.contains(cls)).toBe(true) // col 5
+        expect(cells[7].classList.contains(cls)).toBe(true) // col 8
+      })
+    })
+  })
+
+  describe('SKA sub-row badge structure', () => {
+    it('each SKA label cell has class text-end', () => {
+      const { tbody, ctrl } = buildTable(1000, 1, SKA_ROWS_3)
+      ctrl._processBlock(makeBlock(1001, { skaCoinRows: SKA_ROWS_3 }))
+      const subs = Array.from(
+        tbody.querySelectorAll('tr[data-block-id="1001"][data-ska-accordion-target="subRow"]')
+      ).slice(1) // skip VAR row
+      subs.forEach((r) => {
+        const labelCell = r.querySelector('td[data-type="sub-label"]')
+        expect(labelCell).not.toBeNull()
+        expect(labelCell.classList.contains('text-end')).toBe(true)
+      })
+    })
+
+    it('each SKA label cell contains a span with coin-label and coin-label--ska classes', () => {
+      const { tbody, ctrl } = buildTable(1000, 1, SKA_ROWS_3)
+      ctrl._processBlock(makeBlock(1001, { skaCoinRows: SKA_ROWS_3 }))
+      const subs = Array.from(
+        tbody.querySelectorAll('tr[data-block-id="1001"][data-ska-accordion-target="subRow"]')
+      ).slice(1)
+      subs.forEach((r) => {
+        const badge = r.querySelector('td[data-type="sub-label"] span.coin-label.coin-label--ska')
+        expect(badge).not.toBeNull()
+      })
+    })
+
+    it('each SKA sub-row has exactly 9 td elements', () => {
+      const { tbody, ctrl } = buildTable(1000, 1, SKA_ROWS_3)
+      ctrl._processBlock(makeBlock(1001, { skaCoinRows: SKA_ROWS_3 }))
+      const subs = Array.from(
+        tbody.querySelectorAll('tr[data-block-id="1001"][data-ska-accordion-target="subRow"]')
+      ).slice(1)
+      subs.forEach((r) => expect(r.querySelectorAll('td').length).toBe(9))
+    })
+
+    it('each SKA sub-row col-5 and col-8 have responsive classes', () => {
+      const { tbody, ctrl } = buildTable(1000, 1, SKA_ROWS_3)
+      ctrl._processBlock(makeBlock(1001, { skaCoinRows: SKA_ROWS_3 }))
+      const subs = Array.from(
+        tbody.querySelectorAll('tr[data-block-id="1001"][data-ska-accordion-target="subRow"]')
+      ).slice(1)
+      const responsiveClasses = ['d-none', 'd-sm-table-cell', 'd-md-none', 'd-lg-table-cell']
+      subs.forEach((r) => {
+        const cells = Array.from(r.querySelectorAll('td'))
+        responsiveClasses.forEach((cls) => {
+          expect(cells[4].classList.contains(cls)).toBe(true)
+          expect(cells[7].classList.contains(cls)).toBe(true)
+        })
+      })
+    })
+  })
+
+  describe('parent row chevron structure', () => {
+    it('height cell contains a chevron span before the height link', () => {
+      const { tbody, ctrl } = buildTable(1000, 1, SKA_ROWS_3)
+      ctrl._processBlock(makeBlock(1001, { skaCoinRows: SKA_ROWS_3 }))
+      const blockRow = tbody.querySelector(
+        'tr[data-block-id="1001"][data-ska-accordion-target="blockRow"]'
+      )
+      const heightCell = Array.from(blockRow.querySelectorAll('td')).find(
+        (td) => td.dataset.type === 'height'
+      )
+      const chevron = heightCell.querySelector('span.chevron')
+      expect(chevron).not.toBeNull()
+      expect(chevron.nextElementSibling.tagName).toBe('A')
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Feature: home-block-table-hierarchy — Property-based tests
+// ---------------------------------------------------------------------------
+
+describe('blocklist_controller — home-block-table-hierarchy property tests', () => {
+  // Feature: home-block-table-hierarchy, Property 4: Injected rows are structurally complete
+  it('Property 4: injected rows are structurally complete', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 999999 }),
+        fc.array(
+          fc.record({
+            coin_type: fc.integer({ min: 1, max: 10 }),
+            symbol: fc.constantFrom('SKA-1', 'SKA-2', 'SKA-255'),
+            tx_count: fc.integer({ min: 0, max: 100 }),
+            amount: fc.constantFrom('1M SKA-1', '500K SKA-2', '2B SKA-255'),
+            size: fc.integer({ min: 100, max: 10000 })
+          }),
+          { minLength: 0, maxLength: 5 }
+        ),
+        (topHeight, skaCoinRows) => {
+          const { tbody, ctrl } = buildTable(topHeight, 1, skaCoinRows)
+          const height = topHeight + 1
+          ctrl._processBlock(makeBlock(height, { skaCoinRows }))
+
+          const blockRow = tbody.querySelector(
+            `tr[data-block-id="${height}"][data-ska-accordion-target="blockRow"]`
+          )
+          // chevron in parent row
+          const heightCell = Array.from(blockRow.querySelectorAll('td')).find(
+            (td) => td.dataset.type === 'height'
+          )
+          expect(heightCell.querySelector('span.chevron')).not.toBeNull()
+
+          const varRow = blockRow.nextElementSibling
+          expect(varRow.querySelector('span.coin-label.coin-label--var')).not.toBeNull()
+
+          const allSubs = Array.from(
+            tbody.querySelectorAll(
+              `tr[data-block-id="${height}"][data-ska-accordion-target="subRow"]`
+            )
+          ).slice(1)
+          allSubs.forEach((r) => {
+            expect(r.querySelector('span.coin-label.coin-label--ska')).not.toBeNull()
+          })
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+
+  // Feature: home-block-table-hierarchy, Property 7: Column count invariant
+  it('Property 7: column count invariant — every injected row has exactly 9 td elements', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 999999 }),
+        fc.array(
+          fc.record({
+            coin_type: fc.integer({ min: 1, max: 10 }),
+            symbol: fc.constantFrom('SKA-1', 'SKA-2', 'SKA-3'),
+            tx_count: fc.integer({ min: 0, max: 100 }),
+            amount: fc.constantFrom('1M SKA-1', '500K SKA-2', '2B SKA-3'),
+            size: fc.integer({ min: 100, max: 10000 })
+          }),
+          { minLength: 0, maxLength: 5 }
+        ),
+        (topHeight, skaCoinRows) => {
+          const { tbody, ctrl } = buildTable(topHeight, 1, skaCoinRows)
+          const height = topHeight + 1
+          ctrl._processBlock(makeBlock(height, { skaCoinRows }))
+
+          const allRows = tbody.querySelectorAll(`tr[data-block-id="${height}"]`)
+          allRows.forEach((r) => {
+            expect(r.querySelectorAll('td').length).toBe(9)
+          })
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+
+  // Feature: home-block-table-hierarchy, Property 8: VAR sub-rows use badge-var
+  it('Property 8: VAR sub-rows use badge-var', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 999999 }),
+        fc.array(
+          fc.record({
+            coin_type: fc.integer({ min: 1, max: 10 }),
+            symbol: fc.constantFrom('SKA-1', 'SKA-2', 'SKA-3'),
+            tx_count: fc.integer({ min: 0, max: 100 }),
+            amount: fc.constantFrom('1M SKA-1', '500K SKA-2', '2B SKA-3'),
+            size: fc.integer({ min: 100, max: 10000 })
+          }),
+          { minLength: 0, maxLength: 5 }
+        ),
+        (topHeight, skaCoinRows) => {
+          const { tbody, ctrl } = buildTable(topHeight, 1, skaCoinRows)
+          const height = topHeight + 1
+          ctrl._processBlock(makeBlock(height, { skaCoinRows }))
+
+          const blockRow = tbody.querySelector(
+            `tr[data-block-id="${height}"][data-ska-accordion-target="blockRow"]`
+          )
+          const varRow = blockRow.nextElementSibling
+          expect(varRow.querySelector('span.coin-label.coin-label--var')).not.toBeNull()
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+
+  // Feature: home-block-table-hierarchy, Property 9: All SKA sub-rows use badge-ska regardless of token index
+  it('Property 9: all SKA sub-rows use badge-ska regardless of token index', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 999999 }),
+        fc.array(
+          fc.record({
+            coin_type: fc.integer({ min: 1, max: 255 }),
+            symbol: fc.constantFrom('SKA-1', 'SKA-2', 'SKA-255'),
+            tx_count: fc.integer({ min: 0, max: 100 }),
+            amount: fc.constantFrom('1M SKA-1', '500K SKA-2', '2B SKA-255'),
+            size: fc.integer({ min: 100, max: 10000 })
+          }),
+          { minLength: 1, maxLength: 5 }
+        ),
+        (topHeight, skaCoinRows) => {
+          const { tbody, ctrl } = buildTable(topHeight, 1, skaCoinRows)
+          const height = topHeight + 1
+          ctrl._processBlock(makeBlock(height, { skaCoinRows }))
+
+          const allSubs = Array.from(
+            tbody.querySelectorAll(
+              `tr[data-block-id="${height}"][data-ska-accordion-target="subRow"]`
+            )
+          ).slice(1) // skip VAR
+          expect(allSubs.length).toBe(skaCoinRows.length)
+          allSubs.forEach((r) => {
+            expect(r.querySelector('span.coin-label.coin-label--ska')).not.toBeNull()
+          })
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+
+  // Feature: home-block-table-hierarchy, Property 1: Chevron presence in all parent rows
+  it('Property 1: chevron presence in all injected parent rows', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 999999 }),
+        fc.array(
+          fc.record({
+            coin_type: fc.integer({ min: 1, max: 10 }),
+            symbol: fc.constantFrom('SKA-1', 'SKA-2', 'SKA-3'),
+            tx_count: fc.integer({ min: 0, max: 100 }),
+            amount: fc.constantFrom('1M SKA-1', '500K SKA-2', '2B SKA-3'),
+            size: fc.integer({ min: 100, max: 10000 })
+          }),
+          { minLength: 0, maxLength: 5 }
+        ),
+        (topHeight, skaCoinRows) => {
+          const { tbody, ctrl } = buildTable(topHeight, 1, skaCoinRows)
+          const height = topHeight + 1
+          ctrl._processBlock(makeBlock(height, { skaCoinRows }))
+
+          const blockRow = tbody.querySelector(
+            `tr[data-block-id="${height}"][data-ska-accordion-target="blockRow"]`
+          )
+          const heightCell = Array.from(blockRow.querySelectorAll('td')).find(
+            (td) => td.dataset.type === 'height'
+          )
+          expect(heightCell.querySelector('span.chevron')).not.toBeNull()
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+
+  // Feature: home-block-table-hierarchy, Property 3: Chevron precedes height link in DOM
+  it('Property 3: chevron precedes height link in DOM', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 999999 }), (topHeight) => {
+        const { tbody, ctrl } = buildTable(topHeight, 1)
+        const height = topHeight + 1
+        ctrl._processBlock(makeBlock(height))
+
+        const blockRow = tbody.querySelector(
+          `tr[data-block-id="${height}"][data-ska-accordion-target="blockRow"]`
+        )
+        const heightCell = Array.from(blockRow.querySelectorAll('td')).find(
+          (td) => td.dataset.type === 'height'
+        )
+        const chevron = heightCell.querySelector('span.chevron')
+        expect(chevron).not.toBeNull()
+        expect(chevron.nextElementSibling.tagName).toBe('A')
+      }),
+      { numRuns: 100 }
+    )
+  })
+
+  // Feature: home-block-table-hierarchy, Property 5: Sub-row first cell carries anchor class
+  it('Property 5: sub-row first cell carries data-type="sub-label"', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 999999 }),
+        fc.array(
+          fc.record({
+            coin_type: fc.integer({ min: 1, max: 10 }),
+            symbol: fc.constantFrom('SKA-1', 'SKA-2', 'SKA-3'),
+            tx_count: fc.integer({ min: 0, max: 100 }),
+            amount: fc.constantFrom('1M SKA-1', '500K SKA-2', '2B SKA-3'),
+            size: fc.integer({ min: 100, max: 10000 })
+          }),
+          { minLength: 0, maxLength: 5 }
+        ),
+        (topHeight, skaCoinRows) => {
+          const { tbody, ctrl } = buildTable(topHeight, 1, skaCoinRows)
+          const height = topHeight + 1
+          ctrl._processBlock(makeBlock(height, { skaCoinRows }))
+
+          const allSubs = tbody.querySelectorAll(
+            `tr[data-block-id="${height}"][data-ska-accordion-target="subRow"]`
+          )
+          allSubs.forEach((r) => {
+            const firstCell = r.querySelector('td')
+            expect(firstCell.dataset.type).toBe('sub-label')
+          })
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+
+  // Feature: home-block-table-hierarchy, Property 6: Sub-row first cell is right-aligned
+  it('Property 6: sub-row first cell is left-aligned (text-end)', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 999999 }),
+        fc.array(
+          fc.record({
+            coin_type: fc.integer({ min: 1, max: 10 }),
+            symbol: fc.constantFrom('SKA-1', 'SKA-2', 'SKA-3'),
+            tx_count: fc.integer({ min: 0, max: 100 }),
+            amount: fc.constantFrom('1M SKA-1', '500K SKA-2', '2B SKA-3'),
+            size: fc.integer({ min: 100, max: 10000 })
+          }),
+          { minLength: 0, maxLength: 5 }
+        ),
+        (topHeight, skaCoinRows) => {
+          const { tbody, ctrl } = buildTable(topHeight, 1, skaCoinRows)
+          const height = topHeight + 1
+          ctrl._processBlock(makeBlock(height, { skaCoinRows }))
+
+          const allSubs = tbody.querySelectorAll(
+            `tr[data-block-id="${height}"][data-ska-accordion-target="subRow"]`
+          )
+          allSubs.forEach((r) => {
+            const firstCell = r.querySelector('td')
+            expect(firstCell.classList.contains('text-end')).toBe(true)
+          })
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+
+  // Feature: home-block-table-hierarchy, Property 10: All sub-rows carry subordination class
+  it('Property 10: all sub-rows carry ska-sub-row class', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 999999 }),
+        fc.array(
+          fc.record({
+            coin_type: fc.integer({ min: 1, max: 10 }),
+            symbol: fc.constantFrom('SKA-1', 'SKA-2', 'SKA-3'),
+            tx_count: fc.integer({ min: 0, max: 100 }),
+            amount: fc.constantFrom('1M SKA-1', '500K SKA-2', '2B SKA-3'),
+            size: fc.integer({ min: 100, max: 10000 })
+          }),
+          { minLength: 0, maxLength: 5 }
+        ),
+        (topHeight, skaCoinRows) => {
+          const { tbody, ctrl } = buildTable(topHeight, 1, skaCoinRows)
+          const height = topHeight + 1
+          ctrl._processBlock(makeBlock(height, { skaCoinRows }))
+
+          const allSubs = tbody.querySelectorAll(
+            `tr[data-block-id="${height}"][data-ska-accordion-target="subRow"]`
+          )
+          allSubs.forEach((r) => {
+            expect(r.classList.contains('ska-sub-row')).toBe(true)
+          })
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+
+  // Feature: home-block-table-hierarchy, Property 11: Responsive classes preserved on size and rev cells
+  it('Property 11: responsive classes preserved on col-5 and col-8 in all injected rows', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 999999 }),
+        fc.array(
+          fc.record({
+            coin_type: fc.integer({ min: 1, max: 10 }),
+            symbol: fc.constantFrom('SKA-1', 'SKA-2', 'SKA-3'),
+            tx_count: fc.integer({ min: 0, max: 100 }),
+            amount: fc.constantFrom('1M SKA-1', '500K SKA-2', '2B SKA-3'),
+            size: fc.integer({ min: 100, max: 10000 })
+          }),
+          { minLength: 0, maxLength: 5 }
+        ),
+        (topHeight, skaCoinRows) => {
+          const { tbody, ctrl } = buildTable(topHeight, 1, skaCoinRows)
+          const height = topHeight + 1
+          ctrl._processBlock(makeBlock(height, { skaCoinRows }))
+
+          const responsiveClasses = ['d-none', 'd-sm-table-cell', 'd-md-none', 'd-lg-table-cell']
+          const allRows = tbody.querySelectorAll(`tr[data-block-id="${height}"]`)
+          allRows.forEach((r) => {
+            const cells = Array.from(r.querySelectorAll('td'))
+            responsiveClasses.forEach((cls) => {
+              expect(cells[4].classList.contains(cls)).toBe(true) // col 5 (size)
+              expect(cells[7].classList.contains(cls)).toBe(true) // col 8 (rev)
+            })
+          })
         }
       ),
       { numRuns: 100 }

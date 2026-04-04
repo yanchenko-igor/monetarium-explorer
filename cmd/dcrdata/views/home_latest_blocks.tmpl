@@ -25,6 +25,7 @@
         data-action="click->ska-accordion#toggle"
       >
         <td class="text-start ps-1" data-type="height">
+          <span class="chevron me-1"></span>
           <a href="/block/{{.Height}}" class="fs18">{{.Height}}</a>
         </td>
         <td class="text-end num" data-type="tx">{{.Transactions}}</td>
@@ -39,7 +40,7 @@
         </td>
       </tr>
       <tr class="ska-sub-row" data-ska-accordion-target="subRow" data-block-id="{{$blockHeight}}">
-        <td class="text-start ps-1"><span class="sub-row-label">VAR</span></td>
+        <td class="text-end ps-2 ps-sm-4" data-type="sub-label"><span class="coin-label coin-label--var">VAR</span></td>
         <td class="text-end num">{{if .VARTxCount}}{{.VARTxCount}}{{else}}—{{end}}</td>
         <td class="text-end num">{{.VARAmount}}</td>
         <td class="text-end">—</td>
@@ -51,7 +52,7 @@
       </tr>
       {{range .SKASubRows}}
       <tr class="ska-sub-row" data-ska-accordion-target="subRow" data-block-id="{{$blockHeight}}">
-        <td class="text-start ps-1"><span class="sub-row-label">{{.TokenType}}</span></td>
+        <td class="text-end ps-2 ps-sm-4" data-type="sub-label"><span class="coin-label coin-label--ska">{{.TokenType}}</span></td>
         <td class="text-end num">{{.TxCount}}</td>
         <td class="text-end">—</td>
         <td class="text-end num">{{.Amount}}</td>

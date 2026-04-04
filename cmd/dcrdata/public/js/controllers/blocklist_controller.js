@@ -29,13 +29,13 @@ function coinRowsToSKAData(block) {
     if (cr.coin_type === 0) {
       varTxCount = cr.tx_count
       varAmount = humanize.formatCoinAtoms(cr.amount, cr.coin_type)
-      varSize = cr.size > 0 ? `${cr.size} B` : '—'
+      varSize = cr.size > 0 ? humanize.bytes(cr.size) : '—'
     } else {
       subRows.push({
         tokenType: cr.symbol,
         txCount: cr.tx_count > 0 ? String(cr.tx_count) : '—',
         amount: humanize.formatCoinAtoms(cr.amount, cr.coin_type),
-        size: cr.size > 0 ? `${cr.size} B` : '—'
+        size: cr.size > 0 ? humanize.bytes(cr.size) : '—'
       })
     }
   }
@@ -64,9 +64,10 @@ function insertVARSubRow(tbody, newRow, varTxCount, varAmount, varSize) {
   tr.dataset.skaAccordionTarget = 'subRow'
   tr.dataset.blockId = newRow.dataset.blockId
 
-  const labelTd = makeTd('text-start ps-1')
+  const labelTd = makeTd('text-end ps-2 ps-sm-4')
+  labelTd.dataset.type = 'sub-label'
   const labelSpan = document.createElement('span')
-  labelSpan.className = 'sub-row-label'
+  labelSpan.className = 'coin-label coin-label--var'
   labelSpan.textContent = 'VAR'
   labelTd.appendChild(labelSpan)
   tr.appendChild(labelTd)
@@ -92,9 +93,10 @@ function insertSKASubRows(tbody, insertRef, subRows, blockHeight) {
     tr.dataset.skaAccordionTarget = 'subRow'
     tr.dataset.blockId = String(blockHeight)
 
-    const labelTd = makeTd('text-start ps-1')
+    const labelTd = makeTd('text-end ps-2 ps-sm-4')
+    labelTd.dataset.type = 'sub-label'
     const badge = document.createElement('span')
-    badge.className = 'sub-row-label'
+    badge.className = 'coin-label coin-label--ska'
     badge.textContent = sub.tokenType
     labelTd.appendChild(badge)
     tr.appendChild(labelTd)
@@ -175,6 +177,9 @@ export default class extends Controller {
           newTd.textContent = humanize.timeSince(block.unixStamp)
           break
         case 'height': {
+          const chevron = document.createElement('span')
+          chevron.className = 'chevron me-1'
+          newTd.appendChild(chevron)
           const link = document.createElement('a')
           link.href = `/block/${block.height}`
           link.textContent = block.height
