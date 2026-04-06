@@ -490,9 +490,9 @@ type SKASubRow struct {
 
 // CoinFillData holds per-coin mempool fill bar data.
 type CoinFillData struct {
-	Symbol  string
-	FillPct float64 // 0.0–1.0
-	Color   string  // "green", "yellow", "red"
+	Symbol  string  `json:"symbol"`
+	FillPct float64 `json:"fill_pct"` // 0.0–1.0, relative to bar width
+	Status  string  `json:"status"`   // "ok", "borrowing", "full"
 }
 
 // MempoolCoinStats holds per-coin mempool transaction count, size, and amount.
