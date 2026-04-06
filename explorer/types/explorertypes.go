@@ -1089,10 +1089,10 @@ type MempoolTx struct {
 	TotalOut  float64        `json:"total"`
 	// Consider atom representation:
 	//TotalOutAmt int64        `json:"total_amount"`
-	Type      string            `json:"Type"`
-	TypeID    int               `json:"typeID"` // stake package types
-	VoteInfo  *VoteInfo         `json:"vote_info,omitempty"`
-	SKATotals map[uint8]string  `json:"ska_totals,omitempty"`
+	Type      string           `json:"Type"`
+	TypeID    int              `json:"typeID"` // stake package types
+	VoteInfo  *VoteInfo        `json:"vote_info,omitempty"`
+	SKATotals map[uint8]string `json:"ska_totals,omitempty"`
 }
 
 func (mpt *MempoolTx) DeepCopy() *MempoolTx {
