@@ -495,6 +495,13 @@ type CoinFillData struct {
 	Color   string  // "green", "yellow", "red"
 }
 
+// MempoolCoinStats holds per-coin mempool transaction count, size, and amount.
+type MempoolCoinStats struct {
+	TxCount int    `json:"tx_count"`
+	Size    int32  `json:"size"`
+	Amount  string `json:"amount"` // VAR: int64 atom string; SKA: big.Int atom string
+}
+
 // TrimmedBlockInfo models data needed to display block info on the new home page
 type TrimmedBlockInfo struct {
 	Time         TimeDef
@@ -839,6 +846,8 @@ type MempoolShort struct {
 	VotingInfo         VotingInfo          `json:"voting_info"`
 	InvRegular         map[string]struct{} `json:"-"`
 	InvStake           map[string]struct{} `json:"-"`
+	// CoinStats holds per-coin tx count, size, and amount for all mempool txs.
+	CoinStats map[uint8]MempoolCoinStats `json:"coin_stats,omitempty"`
 }
 
 // LikelyMineable holds the totals for all mempool transactions except for votes
@@ -916,6 +925,13 @@ func (mps *MempoolShort) DeepCopy() *MempoolShort {
 	out.InvStake = make(map[string]struct{}, len(mps.InvStake))
 	for s := range mps.InvStake {
 		out.InvStake[s] = struct{}{}
+	}
+
+	if mps.CoinStats != nil {
+		out.CoinStats = make(map[uint8]MempoolCoinStats, len(mps.CoinStats))
+		for k, v := range mps.CoinStats {
+			out.CoinStats[k] = v
+		}
 	}
 
 	return out
@@ -1073,9 +1089,10 @@ type MempoolTx struct {
 	TotalOut  float64        `json:"total"`
 	// Consider atom representation:
 	//TotalOutAmt int64        `json:"total_amount"`
-	Type     string    `json:"Type"`
-	TypeID   int       `json:"typeID"` // stake package types
-	VoteInfo *VoteInfo `json:"vote_info,omitempty"`
+	Type      string            `json:"Type"`
+	TypeID    int               `json:"typeID"` // stake package types
+	VoteInfo  *VoteInfo         `json:"vote_info,omitempty"`
+	SKATotals map[uint8]string  `json:"ska_totals,omitempty"`
 }
 
 func (mpt *MempoolTx) DeepCopy() *MempoolTx {
@@ -1086,6 +1103,12 @@ func (mpt *MempoolTx) DeepCopy() *MempoolTx {
 	out.Vin = make([]MempoolInput, len(mpt.Vin))
 	copy(out.Vin, mpt.Vin)
 	out.VoteInfo = mpt.VoteInfo.DeepCopy()
+	if mpt.SKATotals != nil {
+		out.SKATotals = make(map[uint8]string, len(mpt.SKATotals))
+		for k, v := range mpt.SKATotals {
+			out.SKATotals[k] = v
+		}
+	}
 	return &out
 }
 

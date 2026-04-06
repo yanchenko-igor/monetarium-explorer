@@ -257,6 +257,7 @@ func (p *MempoolMonitor) TxHandler(rawTx *chainjson.TxRawResult) error {
 		Type:     txTypeStr,
 		TypeID:   int(txType),
 		VoteInfo: voteInfo,
+		SKATotals: txhelpers.SKATotalsFromMsgTx(msgTx),
 	}
 
 	// Maintain a separate total that excludes votes for sidechain

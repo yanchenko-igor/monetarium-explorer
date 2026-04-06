@@ -470,14 +470,37 @@ func (exp *explorerUI) MempoolSignal() chan<- pstypes.HubMessage {
 // []types.MempoolTx so that it may be modified (e.g. sorted) without affecting
 // other MempoolDataSavers.
 func (exp *explorerUI) StoreMPData(_ *mempool.StakeData, _ []types.MempoolTx, inv *types.MempoolInfo) {
-	// Compute per-coin fill bars. VAR occupies 10% of the bar; SKA types share
-	// the remaining 90%. Fill = min(size/maxBlockSize, 1.0).
+	// Compute per-coin fill bars from CoinStats.
+	// VAR occupies 10% of the bar; SKA types share the remaining 90% equally.
+	// Fill = min(size/maxBlockSize, 1.0).
 	const maxBlockSize = 393216.0
-	varFill := math.Min(float64(inv.LikelyMineable.Size)/maxBlockSize, 1.0)
-	inv.CoinFills = []types.CoinFillData{
-		{Symbol: "VAR", FillPct: varFill * 0.10, Color: fillColor(varFill)},
+	skaCoinTypes := make([]uint8, 0)
+	for ct := range inv.CoinStats {
+		if ct != 0 {
+			skaCoinTypes = append(skaCoinTypes, ct)
+		}
 	}
-	// SKA fills are zero until per-coin mempool tracking is implemented.
+	fills := make([]types.CoinFillData, 0, 1+len(skaCoinTypes))
+	if varStats, ok := inv.CoinStats[0]; ok {
+		f := math.Min(float64(varStats.Size)/maxBlockSize, 1.0)
+		fills = append(fills, types.CoinFillData{Symbol: "VAR", FillPct: f * 0.10, Color: fillColor(f)})
+	} else {
+		fills = append(fills, types.CoinFillData{Symbol: "VAR", FillPct: 0, Color: fillColor(0)})
+	}
+	skaShare := 0.0
+	if len(skaCoinTypes) > 0 {
+		skaShare = 0.90 / float64(len(skaCoinTypes))
+	}
+	for _, ct := range skaCoinTypes {
+		s := inv.CoinStats[ct]
+		f := math.Min(float64(s.Size)/maxBlockSize, 1.0)
+		fills = append(fills, types.CoinFillData{
+			Symbol:  fmt.Sprintf("SKA-%d", ct),
+			FillPct: f * skaShare,
+			Color:   fillColor(f),
+		})
+	}
+	inv.CoinFills = fills
 
 	// Get exclusive access to the Mempool field.
 	exp.invsMtx.Lock()
