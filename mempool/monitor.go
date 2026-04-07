@@ -376,6 +376,17 @@ func (p *MempoolMonitor) TxHandler(rawTx *chainjson.TxRawResult) error {
 	p.inventory.Unlock()
 	p.mtx.RUnlock()
 
+	// Notify savers so CoinFills are recomputed with the new tx included.
+	p.mtx.RLock()
+	invCopy := p.inventory.DeepCopy()
+	savers := p.dataSavers
+	p.mtx.RUnlock()
+	for _, s := range savers {
+		if s != nil {
+			go s.StoreMPData(nil, nil, invCopy)
+		}
+	}
+
 	// Broadcast the new transaction.
 	log.Tracef("Signaling new tx to hub relays...")
 	p.hubSend(pstypes.SigNewTx, &tx, time.Second*10)
