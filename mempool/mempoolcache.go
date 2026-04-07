@@ -44,6 +44,9 @@ type DataCache struct {
 // pass a copy of the []types.MempoolTx so that it may be modified (e.g. sorted)
 // without affecting other MempoolDataSavers.
 func (c *DataCache) StoreMPData(stakeData *StakeData, txsCopy []exptypes.MempoolTx, _ *exptypes.MempoolInfo) {
+	if stakeData == nil {
+		return
+	}
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
