@@ -71,7 +71,9 @@ You can define three types of issues in your `tasks.json`:
 
 #### Running the script
 
-The script is fully idempotent (tracks created issues in a `.create_issues_state.json` file so it can be resumed if it fails) and supports dry-runs.
+The tool features robust title-based idempotency, validation checks, and automatic rate-limit processing. All API activity and errors are permanently recorded to `create_issues.log`. If the script encounters a failure it preserves its internal state file and emits a non-zero exit code to fail any associated CI pipelines.
+
+**Note on Resuming**: By default, standard live runs will reset the state file automatically to protect against stale data. Use the `--resume` flag if you are intentionally recovering a previously failed workflow.
 
 ```bash
 cd .github/scripts
@@ -81,11 +83,15 @@ bash create_issues.sh --dry-run
 bash create_issues.sh --dry-run --file my_tasks.json
 
 # Live run (uses defaults: tasks.json, repo and milestone from script config):
+# Will pause to ask for interactive 'yes' confirmation.
 bash create_issues.sh
+
+# Skip the interactive confirmation prompt (useful for CI execution):
+bash create_issues.sh -y
+
+# Resume from a partial failure (skips titles already successfully created):
+bash create_issues.sh --resume
 
 # Override repo and/or milestone via environment variables:
 REPO="monetarium/monetarium-explorer" MILESTONE="v2" bash create_issues.sh
-
-# Reset state and start fresh:
-rm -f .create_issues_state.json && bash create_issues.sh
 ```
