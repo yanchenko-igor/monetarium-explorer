@@ -604,6 +604,7 @@ type TrimmedMempoolInfo struct {
 	Total        float64
 	Time         int64
 	Fees         float64
+	CoinFills    []CoinFillData `json:"coin_fills,omitempty"`
 }
 
 // MempoolInfo models data to update mempool info on the home page.
@@ -661,6 +662,7 @@ func (mpi *MempoolInfo) Trim() *TrimmedMempoolInfo {
 		TAdds:        TrimMempoolTxs(mpi.TAdds),
 		Total:        mpi.TotalOut,
 		Time:         mpi.LastBlockTime,
+		CoinFills:    mpi.CoinFills,
 	}
 
 	mpi.RUnlock()
