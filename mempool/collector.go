@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -473,41 +472,56 @@ func ParseTxns(txs []exptypes.MempoolTx, params *chaincfg.Params, lastBlock *Blo
 	sort.Sort(exptypes.MPTxsByHeight(votes))
 	formattedSize := exptypes.BytesString(uint64(totalSize))
 
-	// Build per-coin stats by iterating all txs once.
-	coinStats := make(map[uint8]exptypes.MempoolCoinStats)
+	// Build per-coin stats: accumulate counts/sizes and amounts natively,
+	// then convert amounts to strings once at the end.
+	type coinAccum struct {
+		txCount int
+		size    int32
+		varAmt  int64
+		skaAmt  map[uint8]*big.Int
+	}
+	accum := make(map[uint8]*coinAccum)
+	getAccum := func(ct uint8) *coinAccum {
+		if accum[ct] == nil {
+			accum[ct] = &coinAccum{}
+		}
+		return accum[ct]
+	}
 	for _, tx := range txs {
 		if len(tx.SKATotals) == 0 {
-			// VAR tx
-			s := coinStats[0]
-			s.TxCount++
-			s.Size += tx.Size
-			if tx.TotalOut > 0 {
-				varAtoms := int64(tx.TotalOut * 1e8)
-				if s.Amount == "" {
-					s.Amount = fmt.Sprintf("%d", varAtoms)
-				} else {
-					prev, _ := strconv.ParseInt(s.Amount, 10, 64)
-					s.Amount = fmt.Sprintf("%d", prev+varAtoms)
-				}
-			}
-			coinStats[0] = s
+			a := getAccum(0)
+			a.txCount++
+			a.size += tx.Size
+			a.varAmt += int64(tx.TotalOut * 1e8)
 		} else {
 			for ct, amtStr := range tx.SKATotals {
-				s := coinStats[ct]
-				s.TxCount++
-				s.Size += tx.Size
-				if s.Amount == "" {
-					s.Amount = amtStr
-				} else {
-					a, _ := new(big.Int).SetString(s.Amount, 10)
-					b, _ := new(big.Int).SetString(amtStr, 10)
-					if a != nil && b != nil {
-						s.Amount = new(big.Int).Add(a, b).String()
-					}
+				a := getAccum(ct)
+				a.txCount++
+				a.size += tx.Size
+				if a.skaAmt == nil {
+					a.skaAmt = make(map[uint8]*big.Int)
 				}
-				coinStats[ct] = s
+				v, _ := new(big.Int).SetString(amtStr, 10)
+				if v != nil {
+					if a.skaAmt[ct] == nil {
+						a.skaAmt[ct] = new(big.Int)
+					}
+					a.skaAmt[ct].Add(a.skaAmt[ct], v)
+				}
 			}
 		}
+	}
+	coinStats := make(map[uint8]exptypes.MempoolCoinStats, len(accum))
+	for ct, a := range accum {
+		s := exptypes.MempoolCoinStats{TxCount: a.txCount, Size: a.size}
+		if ct == 0 {
+			s.Amount = fmt.Sprintf("%d", a.varAmt)
+		} else if a.skaAmt != nil {
+			if v := a.skaAmt[ct]; v != nil {
+				s.Amount = v.String()
+			}
+		}
+		coinStats[ct] = s
 	}
 
 	// Store mempool data for template rendering
