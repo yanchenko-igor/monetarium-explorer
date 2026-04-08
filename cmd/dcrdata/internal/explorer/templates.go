@@ -384,6 +384,20 @@ func makeTemplateFuncMap(params *chaincfg.Params) template.FuncMap {
 		"txtypeStr": func(txtype int) string {
 			return txhelpers.TxTypeToString(txtype)
 		},
+		// skaSplit splits a fixed-point decimal string (e.g. "0.060682851693627761")
+		// into [intPart, firstTwoDecimals, restDecimals].
+		"skaSplit": func(s string) [3]string {
+			dot := strings.IndexByte(s, '.')
+			if dot < 0 {
+				return [3]string{s, "", ""}
+			}
+			intPart := s[:dot]
+			frac := s[dot+1:]
+			if len(frac) <= 2 {
+				return [3]string{intPart, frac, ""}
+			}
+			return [3]string{intPart, frac[:2], frac[2:]}
+		},
 		"add": func(args ...int64) int64 {
 			var sum int64
 			for _, a := range args {

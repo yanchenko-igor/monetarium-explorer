@@ -9,7 +9,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -20,6 +22,7 @@ import (
 	"github.com/monetarium/monetarium-node/txscript/stdscript"
 	"github.com/monetarium/monetarium-node/wire"
 
+	apitypes "github.com/monetarium/monetarium-explorer/api/types"
 	"github.com/monetarium/monetarium-explorer/blockdata"
 	"github.com/monetarium/monetarium-explorer/db/dbtypes"
 	exptypes "github.com/monetarium/monetarium-explorer/explorer/types"
@@ -50,6 +53,8 @@ type DataSource interface {
 	GetChainParams() *chaincfg.Params
 	BlockSubsidy(ctx context.Context, height int64, voters uint16) *chainjson.GetBlockSubsidyResult
 	Difficulty(ctx context.Context, timestamp int64) float64
+	Height() int64
+	GetSummaryRange(ctx context.Context, idx0, idx1 int) []*apitypes.BlockDataBasic
 }
 
 // State represents the current state of block chain.
@@ -695,6 +700,32 @@ func (psh *PubSubHub) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgBl
 		psh.params.TargetTimePerBlock.Hours()/24)
 	//p.GeneralInfo.ASR = ASR
 
+	// Compute per-SKA vote rewards from SSFee totals in this block.
+	sbits, _ := dcrutil.NewAmount(blockData.Header.SBits)
+	ticketPriceAtoms := int64(sbits)
+	voters := int64(blockData.Header.Voters)
+	if ticketPriceAtoms > 0 && voters > 0 && len(blockData.ExtraInfo.SSFeeTotalsByCoin) > 0 {
+		blocksIn30Days := int(30 * 24 * time.Hour / psh.params.TargetTimePerBlock)
+		tip := int(psh.sourceBase.Height())
+		rewards := make([]exptypes.SKAVoteReward, 0, len(blockData.ExtraInfo.SSFeeTotalsByCoin))
+		for ct, totalStr := range blockData.ExtraInfo.SSFeeTotalsByCoin {
+			total, ok := new(big.Int).SetString(totalStr, 10)
+			if !ok {
+				continue
+			}
+			perVote := new(big.Int).Div(total, big.NewInt(voters))
+			rewards = append(rewards, exptypes.SKAVoteReward{
+				CoinType:  ct,
+				Symbol:    fmt.Sprintf("SKA-%d", ct),
+				PerBlock:  psh.formatSKAPerVAR(perVote, ticketPriceAtoms),
+				Per30Days: psh.avgSSFeeRate(ctx, ct, blocksIn30Days, tip),
+				PerYear:   psh.avgSSFeeRate(ctx, ct, blocksIn30Days*12, tip),
+			})
+		}
+		sort.Slice(rewards, func(i, j int) bool { return rewards[i].CoinType < rewards[j].CoinType })
+		p.GeneralInfo.SKAVoteRewards = rewards
+	}
+
 	p.mtx.Unlock()
 
 	// Signal to the websocket hub that a new block was received, but do not
@@ -764,4 +795,62 @@ func (psh *PubSubHub) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgBl
 	}()
 
 	return nil
+}
+
+// formatSKAPerVAR computes (skaAtoms/1e18)/(varAtoms/1e8) with 18dp precision.
+func (psh *PubSubHub) formatSKAPerVAR(skaAtoms *big.Int, varAtoms int64) string {
+	if varAtoms <= 0 || skaAtoms == nil || skaAtoms.Sign() <= 0 {
+		return "0.000000000000000000"
+	}
+	varScale := new(big.Int).Exp(big.NewInt(10), big.NewInt(8), nil)
+	resultScaled := new(big.Int).Mul(skaAtoms, varScale)
+	resultScaled.Div(resultScaled, big.NewInt(varAtoms))
+	dp := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
+	intPart, fracPart := new(big.Int).DivMod(resultScaled, dp, new(big.Int))
+	return fmt.Sprintf("%s.%018d", intPart.String(), fracPart.Int64())
+}
+
+// avgSSFeeRate returns the average SKA/VAR reward rate over the last nBlocks.
+func (psh *PubSubHub) avgSSFeeRate(ctx context.Context, coinType uint8, nBlocks, tip int) string {
+	start := tip - nBlocks + 1
+	if start < 0 {
+		start = 0
+	}
+	summaries := psh.sourceBase.GetSummaryRange(ctx, start, tip)
+	if len(summaries) == 0 {
+		return "0.000000000000000000"
+	}
+	total := new(big.Int)
+	var count int
+	for _, s := range summaries {
+		if s.SSFeeTotalsByCoin == nil {
+			continue
+		}
+		v, ok := s.SSFeeTotalsByCoin[coinType]
+		if !ok {
+			continue
+		}
+		amt, ok := new(big.Int).SetString(v, 10)
+		if !ok {
+			continue
+		}
+		ticketPriceAtoms := int64(s.StakeDiff * 1e8)
+		if ticketPriceAtoms <= 0 {
+			continue
+		}
+		voters := int64(psh.params.TicketsPerBlock)
+		perVote := new(big.Int).Div(amt, big.NewInt(voters))
+		varScale := new(big.Int).Exp(big.NewInt(10), big.NewInt(8), nil)
+		rs := new(big.Int).Mul(perVote, varScale)
+		ratio := new(big.Int).Div(rs, big.NewInt(ticketPriceAtoms))
+		total.Add(total, ratio)
+		count++
+	}
+	if count == 0 {
+		return "0.000000000000000000"
+	}
+	avg := new(big.Int).Div(total, big.NewInt(int64(count)))
+	dp := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
+	intPart, fracPart := new(big.Int).DivMod(avg, dp, new(big.Int))
+	return fmt.Sprintf("%s.%018d", intPart.String(), fracPart.Int64())
 }

@@ -530,6 +530,7 @@ type BlockInfo struct {
 	Tickets               []*TrimmedTxInfo
 	Revs                  []*TrimmedTxInfo
 	Votes                 []*TrimmedTxInfo
+	StakeFees             []*TrimmedTxInfo
 	Misses                []string
 	Nonce                 uint32
 	VoteBits              uint16
@@ -557,6 +558,15 @@ type Conversion struct {
 	Index string  `json:"index"`
 }
 
+// SKAVoteReward holds per-SKA-type staker reward rates expressed as SKA atoms per VAR atom.
+type SKAVoteReward struct {
+	CoinType  uint8  `json:"coin_type"`
+	Symbol    string `json:"symbol"`
+	PerBlock  string `json:"per_block"`   // SKA/VAR ratio for last block, 18dp decimal string
+	Per30Days string `json:"per_30_days"` // 30-day average
+	PerYear   string `json:"per_year"`    // annualised average
+}
+
 // HomeInfo represents data used for the home page
 type HomeInfo struct {
 	CoinSupply            int64                    `json:"coin_supply"`
@@ -582,6 +592,7 @@ type HomeInfo struct {
 	HashRateChangeDay     float64                  `json:"hash_rate_change_day"`
 	HashRateChangeMonth   float64                  `json:"hash_rate_change_month"`
 	ExchangeRate          *Conversion              `json:"exchange_rate,omitempty"`
+	SKAVoteRewards        []SKAVoteReward          `json:"ska_vote_rewards,omitempty"`
 }
 
 // BlockSubsidy is an implementation of chainjson.GetBlockSubsidyResult
