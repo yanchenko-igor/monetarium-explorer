@@ -6,8 +6,6 @@ import (
 
 	"github.com/monetarium/monetarium-node/blockchain/stake"
 	"github.com/monetarium/monetarium-node/wire"
-
-	apitypes "github.com/monetarium/monetarium-explorer/api/types"
 )
 
 // pre-computed constants to avoid repeated allocations.
@@ -15,6 +13,12 @@ var (
 	ssfeeVarScale = new(big.Int).Exp(big.NewInt(10), big.NewInt(8), nil)  // 1e8
 	ssfeeDp       = new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil) // 1e18
 )
+
+// SSFeeSummary holds the per-block data needed to compute average SKA/VAR rates.
+type SSFeeSummary struct {
+	SSFeeTotalsByCoin map[uint8]string
+	StakeDiff         float64 // ticket price in VAR coins
+}
 
 // BlockSSFeeTotals sums TxTypeSSFee output SKAValues per coin type for a block.
 // Returns nil if no SSFee transactions are present.
@@ -58,7 +62,7 @@ func FormatSKAPerVAR(skaAtoms *big.Int, varAtoms int64) string {
 
 // AvgSSFeeRate returns the average SKA/VAR staker reward rate over the provided
 // block summaries for the given coin type and voter count per block.
-func AvgSSFeeRate(summaries []*apitypes.BlockDataBasic, coinType uint8, ticketsPerBlock uint16) string {
+func AvgSSFeeRate(summaries []SSFeeSummary, coinType uint8, ticketsPerBlock uint16) string {
 	total := new(big.Int)
 	var count int
 	voters := int64(ticketsPerBlock)

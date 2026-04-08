@@ -707,6 +707,23 @@ func (psh *PubSubHub) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgBl
 	if ticketPriceAtoms > 0 && voters > 0 && len(blockData.ExtraInfo.SSFeeTotalsByCoin) > 0 {
 		blocksIn30Days := int(30 * 24 * time.Hour / psh.params.TargetTimePerBlock)
 		tip := int(psh.sourceBase.Height())
+		start30 := tip - blocksIn30Days
+		if start30 < 0 {
+			start30 = 0
+		}
+		startYear := tip - blocksIn30Days*12
+		if startYear < 0 {
+			startYear = 0
+		}
+		toSummaries := func(blocks []*apitypes.BlockDataBasic) []txhelpers.SSFeeSummary {
+			s := make([]txhelpers.SSFeeSummary, len(blocks))
+			for i, b := range blocks {
+				s[i] = txhelpers.SSFeeSummary{SSFeeTotalsByCoin: b.SSFeeTotalsByCoin, StakeDiff: b.StakeDiff}
+			}
+			return s
+		}
+		sum30 := toSummaries(psh.sourceBase.GetSummaryRange(ctx, start30, tip))
+		sumYear := toSummaries(psh.sourceBase.GetSummaryRange(ctx, startYear, tip))
 		rewards := make([]exptypes.SKAVoteReward, 0, len(blockData.ExtraInfo.SSFeeTotalsByCoin))
 		for ct, totalStr := range blockData.ExtraInfo.SSFeeTotalsByCoin {
 			total, ok := new(big.Int).SetString(totalStr, 10)
@@ -714,20 +731,12 @@ func (psh *PubSubHub) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgBl
 				continue
 			}
 			perVote := new(big.Int).Div(total, big.NewInt(voters))
-			start30 := tip - blocksIn30Days
-			if start30 < 0 {
-				start30 = 0
-			}
-			startYear := tip - blocksIn30Days*12
-			if startYear < 0 {
-				startYear = 0
-			}
 			rewards = append(rewards, exptypes.SKAVoteReward{
 				CoinType:  ct,
 				Symbol:    fmt.Sprintf("SKA-%d", ct),
 				PerBlock:  txhelpers.FormatSKAPerVAR(perVote, ticketPriceAtoms),
-				Per30Days: txhelpers.AvgSSFeeRate(psh.sourceBase.GetSummaryRange(ctx, start30, tip), ct, psh.params.TicketsPerBlock),
-				PerYear:   txhelpers.AvgSSFeeRate(psh.sourceBase.GetSummaryRange(ctx, startYear, tip), ct, psh.params.TicketsPerBlock),
+				Per30Days: txhelpers.AvgSSFeeRate(sum30, ct, psh.params.TicketsPerBlock),
+				PerYear:   txhelpers.AvgSSFeeRate(sumYear, ct, psh.params.TicketsPerBlock),
 			})
 		}
 		sort.Slice(rewards, func(i, j int) bool { return rewards[i].CoinType < rewards[j].CoinType })
