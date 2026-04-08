@@ -11,9 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/monetarium/monetarium-node/blockchain/stake"
-	"github.com/monetarium/monetarium-node/chaincfg"
-	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
+	"github.com/monetarium/monetarium-node/chaincfg"	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
 	"github.com/monetarium/monetarium-node/cointype"
 	"github.com/monetarium/monetarium-node/dcrutil"
 	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
@@ -255,7 +253,7 @@ func (t *Collector) CollectBlockInfo(hash *chainhash.Hash) (*apitypes.BlockDataB
 	}
 
 	// Accumulate per-coin SSFee totals for SKA vote reward calculation.
-	if ssfee := blockSSFeeTotals(msgBlock); len(ssfee) > 0 {
+	if ssfee := txhelpers.BlockSSFeeTotals(msgBlock); len(ssfee) > 0 {
 		extrainfo.SSFeeTotalsByCoin = ssfee
 	}
 
@@ -455,32 +453,4 @@ func blockCoinAmounts(msgBlock *wire.MsgBlock) map[uint8]string {
 		out[k] = v.String()
 	}
 	return out
-}
-
-// blockSSFeeTotals sums TxTypeSSFee output SKAValues per coin type.
-// Returns nil if no SSFee transactions are present.
-func blockSSFeeTotals(msgBlock *wire.MsgBlock) map[uint8]string {
-	totals := make(map[uint8]*big.Int)
-	for _, tx := range msgBlock.STransactions {
-		if stake.DetermineTxType(tx) != stake.TxTypeSSFee {
-			continue
-		}
-		for _, out := range tx.TxOut {
-			if out.CoinType.IsSKA() && out.SKAValue != nil {
-				ct := uint8(out.CoinType)
-				if totals[ct] == nil {
-					totals[ct] = new(big.Int)
-				}
-				totals[ct].Add(totals[ct], out.SKAValue)
-			}
-		}
-	}
-	if len(totals) == 0 {
-		return nil
-	}
-	result := make(map[uint8]string, len(totals))
-	for ct, v := range totals {
-		result[ct] = v.String()
-	}
-	return result
 }

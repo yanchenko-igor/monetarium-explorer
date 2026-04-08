@@ -591,20 +591,30 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 	voters := int64(blockData.Header.Voters)
 	if ticketPriceAtoms > 0 && voters > 0 && len(blockData.ExtraInfo.SSFeeTotalsByCoin) > 0 {
 		blocksIn30Days := int(30 * 24 * time.Hour / exp.ChainParams.TargetTimePerBlock)
+		tip := int(exp.dataSource.Height())
+		start30 := tip - blocksIn30Days
+		if start30 < 0 {
+			start30 = 0
+		}
+		startYear := tip - blocksIn30Days*12
+		if startYear < 0 {
+			startYear = 0
+		}
+		sum30 := exp.dataSource.GetSummaryRange(ctx, start30, tip)
+		sumYear := exp.dataSource.GetSummaryRange(ctx, startYear, tip)
 		rewards := make([]types.SKAVoteReward, 0, len(blockData.ExtraInfo.SSFeeTotalsByCoin))
 		for ct, totalStr := range blockData.ExtraInfo.SSFeeTotalsByCoin {
 			total, ok := new(big.Int).SetString(totalStr, 10)
 			if !ok {
 				continue
 			}
-			// per-vote amount = total distributed / number of voters
 			perVote := new(big.Int).Div(total, big.NewInt(voters))
 			rewards = append(rewards, types.SKAVoteReward{
 				CoinType:  ct,
 				Symbol:    fmt.Sprintf("SKA-%d", ct),
-				PerBlock:  formatSKAPerVAR(perVote, ticketPriceAtoms),
-				Per30Days: exp.avgSSFeeRate(ctx, ct, blocksIn30Days),
-				PerYear:   exp.avgSSFeeRate(ctx, ct, blocksIn30Days*12),
+				PerBlock:  txhelpers.FormatSKAPerVAR(perVote, ticketPriceAtoms),
+				Per30Days: txhelpers.AvgSSFeeRate(sum30, ct, exp.ChainParams.TicketsPerBlock),
+				PerYear:   txhelpers.AvgSSFeeRate(sumYear, ct, exp.ChainParams.TicketsPerBlock),
 			})
 		}
 		sort.Slice(rewards, func(i, j int) bool { return rewards[i].CoinType < rewards[j].CoinType })
@@ -1038,71 +1048,4 @@ func computeCoinFills(stats map[uint8]types.MempoolCoinStats, maxBlockSize float
 		})
 	}
 	return fills
-}
-
-// formatSKAPerVAR computes (skaAtoms/1e18) / (varAtoms/1e8) — SKA coins per
-// VAR coin — and returns a fixed-point decimal string with 18 decimal places.
-func formatSKAPerVAR(skaAtoms *big.Int, varAtoms int64) string {
-	if varAtoms <= 0 || skaAtoms == nil || skaAtoms.Sign() <= 0 {
-		return "0.000000000000000000"
-	}
-	// result_coins = skaAtoms/1e18 / (varAtoms/1e8) = skaAtoms * 1e8 / varAtoms / 1e18
-	// result_scaled (18dp) = skaAtoms * 1e8 / varAtoms
-	varScale := new(big.Int).Exp(big.NewInt(10), big.NewInt(8), nil) // 1e8 VAR atoms/coin
-	resultScaled := new(big.Int).Mul(skaAtoms, varScale)
-	resultScaled.Div(resultScaled, big.NewInt(varAtoms))
-	// split at 1e18 for display
-	dp := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
-	intPart, fracPart := new(big.Int).DivMod(resultScaled, dp, new(big.Int))
-	return fmt.Sprintf("%s.%018d", intPart.String(), fracPart.Int64())
-}
-
-// avgSSFeeRate returns the average SKA/VAR reward rate over the last nBlocks
-// blocks by querying ssfee_totals from the DB.
-func (exp *explorerUI) avgSSFeeRate(ctx context.Context, coinType uint8, nBlocks int) string {
-	tip := int(exp.dataSource.Height())
-	start := tip - nBlocks + 1
-	if start < 0 {
-		start = 0
-	}
-	summaries := exp.dataSource.GetSummaryRange(ctx, start, tip)
-	if len(summaries) == 0 {
-		return "0.000000000000000000"
-	}
-	total := new(big.Int)
-	var count int
-	for _, s := range summaries {
-		if s.SSFeeTotalsByCoin == nil {
-			continue
-		}
-		v, ok := s.SSFeeTotalsByCoin[coinType]
-		if !ok {
-			continue
-		}
-		amt, ok := new(big.Int).SetString(v, 10)
-		if !ok {
-			continue
-		}
-		ticketPriceAtoms := int64(s.StakeDiff * 1e8)
-		if ticketPriceAtoms <= 0 {
-			continue
-		}
-		// per-vote amount = total / expected voters per block
-		voters := int64(exp.ChainParams.TicketsPerBlock)
-		perVote := new(big.Int).Div(amt, big.NewInt(voters))
-		// result_scaled = perVote * 1e8 / ticketPriceAtoms  (same as formatSKAPerVAR)
-		varScale := new(big.Int).Exp(big.NewInt(10), big.NewInt(8), nil)
-		rs := new(big.Int).Mul(perVote, varScale)
-		ratio := new(big.Int).Div(rs, big.NewInt(ticketPriceAtoms))
-		total.Add(total, ratio)
-		count++
-	}
-	if count == 0 {
-		return "0.000000000000000000"
-	}
-	avg := new(big.Int).Div(total, big.NewInt(int64(count)))
-	// avg is in 1e26 scale; split at 1e18 for 18dp display
-	dp := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
-	intPart, fracPart := new(big.Int).DivMod(avg, dp, new(big.Int))
-	return fmt.Sprintf("%s.%018d", intPart.String(), fracPart.Int64())
 }

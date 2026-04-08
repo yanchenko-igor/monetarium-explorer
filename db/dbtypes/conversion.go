@@ -5,7 +5,6 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/monetarium/monetarium-node/blockchain/stake"
 	"github.com/monetarium/monetarium-node/chaincfg"
 	"github.com/monetarium/monetarium-node/cointype"
 	"github.com/monetarium/monetarium-node/wire"
@@ -69,34 +68,6 @@ func blockCoinTxStats(msgBlock *wire.MsgBlock) map[uint8]CoinTxStats {
 	return stats
 }
 
-// blockSSFeeTotals sums TxTypeSSFee output SKAValues per coin type.
-// Returns nil if no SSFee transactions are present.
-func blockSSFeeTotals(msgBlock *wire.MsgBlock) map[uint8]string {
-	totals := make(map[uint8]*big.Int)
-	for _, tx := range msgBlock.STransactions {
-		if stake.DetermineTxType(tx) != stake.TxTypeSSFee {
-			continue
-		}
-		for _, out := range tx.TxOut {
-			if out.CoinType.IsSKA() && out.SKAValue != nil {
-				ct := uint8(out.CoinType)
-				if totals[ct] == nil {
-					totals[ct] = new(big.Int)
-				}
-				totals[ct].Add(totals[ct], out.SKAValue)
-			}
-		}
-	}
-	if len(totals) == 0 {
-		return nil
-	}
-	result := make(map[uint8]string, len(totals))
-	for ct, v := range totals {
-		result[ct] = v.String()
-	}
-	return result
-}
-
 // MsgBlockToDBBlock creates a dbtypes.Block from a wire.MsgBlock
 func MsgBlockToDBBlock(msgBlock *wire.MsgBlock, chainParams *chaincfg.Params, chainWork string, winners []ChainHash) *Block {
 	// Create the dbtypes.Block structure
@@ -128,7 +99,7 @@ func MsgBlockToDBBlock(msgBlock *wire.MsgBlock, chainParams *chaincfg.Params, ch
 		Winners:           winners,
 		CoinAmounts:       blockCoinAmounts(msgBlock),
 		CoinTxStats:       blockCoinTxStats(msgBlock),
-		SSFeeTotalsByCoin: blockSSFeeTotals(msgBlock),
+		SSFeeTotalsByCoin: txhelpers.BlockSSFeeTotals(msgBlock),
 	}
 }
 
