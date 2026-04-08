@@ -5955,6 +5955,7 @@ func (pgb *ChainDB) GetExplorerBlock(ctx context.Context, hash string) *exptypes
 	votes := make([]*exptypes.TrimmedTxInfo, 0, block.Voters)
 	revocations := make([]*exptypes.TrimmedTxInfo, 0, block.Revocations)
 	tickets := make([]*exptypes.TrimmedTxInfo, 0, block.FreshStake)
+	var stakeFees []*exptypes.TrimmedTxInfo
 
 	var treasury []*exptypes.TrimmedTxInfo
 	// treasuryActive := txhelpers.IsTreasuryActive(pgb.chainParams.Net, b.Height)
@@ -5986,6 +5987,8 @@ func (pgb *ChainDB) GetExplorerBlock(ctx context.Context, hash string) *exptypes
 			revocations = append(revocations, stx)
 		case stake.TxTypeTAdd, stake.TxTypeTSpend, stake.TxTypeTreasuryBase:
 			treasury = append(treasury, stx)
+		case stake.TxTypeSSFee:
+			stakeFees = append(stakeFees, stx)
 		}
 	}
 
@@ -6015,6 +6018,7 @@ func (pgb *ChainDB) GetExplorerBlock(ctx context.Context, hash string) *exptypes
 	block.Votes = votes
 	block.Revs = revocations
 	block.Tickets = tickets
+	block.StakeFees = stakeFees
 	block.TotalMixed = totalMixed
 
 	sortTx := func(txs []*exptypes.TrimmedTxInfo) {
@@ -6028,6 +6032,7 @@ func (pgb *ChainDB) GetExplorerBlock(ctx context.Context, hash string) *exptypes
 	sortTx(block.Votes)
 	sortTx(block.Revs)
 	sortTx(block.Tickets)
+	sortTx(block.StakeFees)
 
 	getTotalFee := func(txs []*exptypes.TrimmedTxInfo) (total dcrutil.Amount) {
 		for _, tx := range txs {
@@ -6056,7 +6061,7 @@ func (pgb *ChainDB) GetExplorerBlock(ctx context.Context, hash string) *exptypes
 		return
 	}
 	block.TotalSent = (getTotalSent(block.Tx) + getTotalSent(block.Treasury) + getTotalSent(block.Revs) +
-		getTotalSent(block.Tickets) + getTotalSent(block.Votes)).ToCoin()
+		getTotalSent(block.Tickets) + getTotalSent(block.Votes) + getTotalSent(block.StakeFees)).ToCoin()
 	block.MiningFee = (getTotalFee(block.Tx) + getTotalFee(block.Treasury) + getTotalFee(block.Revs) +
 		getTotalFee(block.Tickets) + getTotalFee(block.Votes)).ToCoin()
 

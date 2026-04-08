@@ -1137,6 +1137,7 @@ const (
 	TxTypeTreasurybase  string = "Treasurybase"
 	TxTypeTreasurySpend string = "Treasury Spend"
 	TxTypeTreasuryAdd   string = "Treasury Add"
+	TxTypeSSFee         string = "Stake Fee"
 )
 
 // DetermineTxTypeString returns a string representing the transaction type
@@ -1173,6 +1174,8 @@ func TxTypeToString(txType int) string {
 		return TxTypeTreasurySpend
 	case stake.TxTypeTreasuryBase:
 		return TxTypeTreasurybase
+	case stake.TxTypeSSFee:
+		return TxTypeSSFee
 	default:
 		return TxTypeRegular
 	}

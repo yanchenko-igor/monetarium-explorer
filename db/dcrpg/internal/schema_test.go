@@ -76,6 +76,7 @@ func TestNewColumnsPresent(t *testing.T) {
 		{"votes.vote_reward TEXT", CreateVotesTable, "vote_reward TEXT"},
 		{"blocks.coin_amounts JSONB", CreateBlockTable, "coin_amounts JSONB"},
 		{"blocks.coin_tx_stats JSONB", CreateBlockTable, "coin_tx_stats JSONB"},
+		{"blocks.ssfee_totals JSONB", CreateBlockTable, "ssfee_totals JSONB"},
 	}
 	for _, tc := range checks {
 		t.Run(tc.name, func(t *testing.T) {

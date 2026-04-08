@@ -18,6 +18,7 @@ import (
 	"os/signal"
 	"reflect"
 	"runtime"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -29,6 +30,7 @@ import (
 	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
 	"github.com/monetarium/monetarium-node/wire"
 
+	apitypes "github.com/monetarium/monetarium-explorer/api/types"
 	"github.com/monetarium/monetarium-explorer/blockdata"
 	"github.com/monetarium/monetarium-explorer/db/dbtypes"
 	"github.com/monetarium/monetarium-explorer/exchanges"
@@ -118,6 +120,7 @@ type explorerDataSource interface {
 	GetExplorerFullBlocks(ctx context.Context, start int, end int) []*types.BlockInfo
 	CurrentDifficulty(context.Context) (float64, error)
 	Difficulty(ctx context.Context, timestamp int64) float64
+	GetSummaryRange(ctx context.Context, idx0, idx1 int) []*apitypes.BlockDataBasic
 }
 
 type PoliteiaBackend interface {
@@ -569,8 +572,14 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 
 	posSubsPerVote := dcrutil.Amount(blockData.ExtraInfo.NextBlockSubsidy.PoS).ToCoin() /
 		float64(exp.ChainParams.TicketsPerBlock)
-	p.HomeInfo.TicketReward = 100 * posSubsPerVote /
-		blockData.CurrentStakeDiff.CurrentStakeDifficulty
+	ticketRewardPct := 100 * posSubsPerVote / blockData.CurrentStakeDiff.CurrentStakeDifficulty
+	p.HomeInfo.TicketReward = ticketRewardPct
+	p.HomeInfo.VoteVARReward = types.VoteVARReward{
+		PerBlock:  posSubsPerVote / blockData.CurrentStakeDiff.CurrentStakeDifficulty,
+		Per30Days: ticketRewardPct,
+		// PerYear (ASR) is computed asynchronously below; set placeholder here.
+		PerYear: p.HomeInfo.ASR,
+	}
 
 	// The actual reward of a ticket needs to also take into consideration the
 	// ticket maturity (time from ticket purchase until its eligible to vote)
@@ -581,6 +590,49 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 		int64(exp.ChainParams.CoinbaseMaturity)
 	p.HomeInfo.RewardPeriod = fmt.Sprintf("%.2f days", float64(avgSSTxToSSGenMaturity)*
 		exp.ChainParams.TargetTimePerBlock.Hours()/24)
+
+	// Compute per-SKA vote rewards from SSFee totals in this block.
+	sbits, _ := dcrutil.NewAmount(blockData.Header.SBits)
+	ticketPriceAtoms := int64(sbits)
+	voters := int64(blockData.Header.Voters)
+	if ticketPriceAtoms > 0 && voters > 0 && len(blockData.ExtraInfo.SSFeeTotalsByCoin) > 0 {
+		blocksIn30Days := int(30 * 24 * time.Hour / exp.ChainParams.TargetTimePerBlock)
+		tip := int(exp.dataSource.Height())
+		start30 := tip - blocksIn30Days
+		if start30 < 0 {
+			start30 = 0
+		}
+		startYear := tip - blocksIn30Days*12
+		if startYear < 0 {
+			startYear = 0
+		}
+		sum30 := exp.dataSource.GetSummaryRange(ctx, start30, tip)
+		sumYear := exp.dataSource.GetSummaryRange(ctx, startYear, tip)
+		toSummaries := func(blocks []*apitypes.BlockDataBasic) []txhelpers.SSFeeSummary {
+			s := make([]txhelpers.SSFeeSummary, len(blocks))
+			for i, b := range blocks {
+				s[i] = txhelpers.SSFeeSummary{SSFeeTotalsByCoin: b.SSFeeTotalsByCoin, StakeDiff: b.StakeDiff}
+			}
+			return s
+		}
+		rewards := make([]types.SKAVoteReward, 0, len(blockData.ExtraInfo.SSFeeTotalsByCoin))
+		for ct, totalStr := range blockData.ExtraInfo.SSFeeTotalsByCoin {
+			total, ok := new(big.Int).SetString(totalStr, 10)
+			if !ok {
+				continue
+			}
+			perVote := new(big.Int).Div(total, big.NewInt(voters))
+			rewards = append(rewards, types.SKAVoteReward{
+				CoinType:  ct,
+				Symbol:    fmt.Sprintf("SKA-%d", ct),
+				PerBlock:  txhelpers.FormatSKAPerVAR(perVote, ticketPriceAtoms),
+				Per30Days: txhelpers.AvgSSFeeRate(toSummaries(sum30), ct, exp.ChainParams.TicketsPerBlock),
+				PerYear:   txhelpers.AvgSSFeeRate(toSummaries(sumYear), ct, exp.ChainParams.TicketsPerBlock),
+			})
+		}
+		sort.Slice(rewards, func(i, j int) bool { return rewards[i].CoinType < rewards[j].CoinType })
+		p.HomeInfo.SKAVoteRewards = rewards
+	}
 
 	// If exchange monitoring is enabled, set the exchange rate.
 	if exp.xcBot != nil {
@@ -619,6 +671,7 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 			float64(height), sdiff)
 		p.Lock()
 		p.HomeInfo.ASR = ASR
+		p.HomeInfo.VoteVARReward.PerYear = ASR
 		p.Unlock()
 	}(newBlockData.Height, blockData.CurrentStakeDiff.CurrentStakeDifficulty,
 		blockData.ExtraInfo.CoinSupply) // eval args now instead of in closure
