@@ -572,8 +572,14 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 
 	posSubsPerVote := dcrutil.Amount(blockData.ExtraInfo.NextBlockSubsidy.PoS).ToCoin() /
 		float64(exp.ChainParams.TicketsPerBlock)
-	p.HomeInfo.TicketReward = 100 * posSubsPerVote /
-		blockData.CurrentStakeDiff.CurrentStakeDifficulty
+	ticketRewardPct := 100 * posSubsPerVote / blockData.CurrentStakeDiff.CurrentStakeDifficulty
+	p.HomeInfo.TicketReward = ticketRewardPct
+	p.HomeInfo.VoteVARReward = types.VoteVARReward{
+		PerBlock:  posSubsPerVote / blockData.CurrentStakeDiff.CurrentStakeDifficulty,
+		Per30Days: ticketRewardPct,
+		// PerYear (ASR) is computed asynchronously below; set placeholder here.
+		PerYear: p.HomeInfo.ASR,
+	}
 
 	// The actual reward of a ticket needs to also take into consideration the
 	// ticket maturity (time from ticket purchase until its eligible to vote)
@@ -665,6 +671,7 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 			float64(height), sdiff)
 		p.Lock()
 		p.HomeInfo.ASR = ASR
+		p.HomeInfo.VoteVARReward.PerYear = ASR
 		p.Unlock()
 	}(newBlockData.Height, blockData.CurrentStakeDiff.CurrentStakeDifficulty,
 		blockData.ExtraInfo.CoinSupply) // eval args now instead of in closure

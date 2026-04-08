@@ -686,8 +686,13 @@ func (psh *PubSubHub) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgBl
 
 	posSubsPerVote := dcrutil.Amount(blockData.ExtraInfo.NextBlockSubsidy.PoS).ToCoin() /
 		float64(psh.params.TicketsPerBlock)
-	p.GeneralInfo.TicketReward = 100 * posSubsPerVote /
-		blockData.CurrentStakeDiff.CurrentStakeDifficulty
+	ticketRewardPct := 100 * posSubsPerVote / blockData.CurrentStakeDiff.CurrentStakeDifficulty
+	p.GeneralInfo.TicketReward = ticketRewardPct
+	p.GeneralInfo.VoteVARReward = exptypes.VoteVARReward{
+		PerBlock:  posSubsPerVote / blockData.CurrentStakeDiff.CurrentStakeDifficulty,
+		Per30Days: ticketRewardPct,
+		PerYear:   p.GeneralInfo.ASR, // ASR not recomputed in pubsub path; use last known value
+	}
 
 	// The actual reward of a ticket needs to also take into consideration the
 	// ticket maturity (time from ticket purchase until its eligible to vote)

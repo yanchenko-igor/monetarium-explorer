@@ -567,6 +567,14 @@ type SKAVoteReward struct {
 	PerYear   string `json:"per_year"`    // annualised average
 }
 
+// VoteVARReward holds the VAR staker reward rate expressed as VAR earned per
+// VAR staked (i.e. reward/ticketPrice) for last block, 30-day, and yearly.
+type VoteVARReward struct {
+	PerBlock  float64 `json:"per_block"`   // VAR/VAR for the last block
+	Per30Days float64 `json:"per_30_days"` // percentage per 30 days
+	PerYear   float64 `json:"per_year"`    // annualised percentage (ASR)
+}
+
 // HomeInfo represents data used for the home page
 type HomeInfo struct {
 	CoinSupply            int64                    `json:"coin_supply"`
@@ -592,6 +600,7 @@ type HomeInfo struct {
 	HashRateChangeDay     float64                  `json:"hash_rate_change_day"`
 	HashRateChangeMonth   float64                  `json:"hash_rate_change_month"`
 	ExchangeRate          *Conversion              `json:"exchange_rate,omitempty"`
+	VoteVARReward         VoteVARReward            `json:"vote_var_reward"`
 	SKAVoteRewards        []SKAVoteReward          `json:"ska_vote_rewards,omitempty"`
 }
 
