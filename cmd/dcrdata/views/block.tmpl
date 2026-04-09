@@ -364,6 +364,34 @@
 		</table>
 		{{- end -}}
 
+		{{if .StakeFees -}}
+		<span class="d-inline-block pt-4 pb-1 h4">Stake Fees</span>
+		<table class="table">
+			<thead>
+				<tr>
+					<th>Transaction ID</th>
+					<th class="text-end">Total</th>
+					<th class="text-end">Fee</th>
+					<th class="text-end">Size</th>
+				</tr>
+			</thead>
+			<tbody>
+			{{range .StakeFees -}}
+				<tr>
+					<td class="break-word">
+						<span><a class="hash" href="/tx/{{.TxID}}">{{.TxID}}</a></span>
+					</td>
+					<td class="mono fs15 text-end">
+						{{template "decimalParts" (float64AsDecimalParts .Total 8 false)}}
+					</td>
+					<td class="mono fs15 text-end">{{.Fee}}</td>
+					<td class="mono fs15 text-end">{{.FormattedSize}}</td>
+				</tr>
+			{{- end}}
+			</tbody>
+		</table>
+		{{- end -}}
+
 		<span class="d-inline-block pt-4 pb-1 h4">Transactions</span>
 		{{if not .TxAvailable -}}
 		<table class="table">

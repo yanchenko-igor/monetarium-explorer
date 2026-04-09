@@ -70,7 +70,9 @@ export default class extends Controller {
       'convertedStake',
       'mixedPct',
       'indicatorList',
-      'totalBar'
+      'totalBar',
+      'skaVoteRewards',
+      'coinFillBars'
     ]
   }
 
@@ -105,6 +107,7 @@ export default class extends Controller {
       const m = JSON.parse(evt)
       this.mempool.replace(m)
       this.setMempoolFigures()
+      this.updateCoinFillBars(m.coin_fills)
       this.renderLatestTransactions(m.latest, true)
       this.updateIndicators(m)
       keyNav(evt, false, true)
@@ -166,6 +169,18 @@ export default class extends Controller {
       this.mpTicketBarTarget.style.width = `${(totals.ticket / totals.total) * 100}%`
       this.mpRevBarTarget.style.width = `${(totals.rev / totals.total) * 100}%`
     }
+  }
+
+  updateCoinFillBars(coinFills) {
+    if (!this.hasCoinFillBarsTarget || !coinFills || !coinFills.length) return
+    this.coinFillBarsTarget.innerHTML = coinFills
+      .map(
+        (f) =>
+          `<div style="flex:1;background:#eee;height:8px;border-radius:3px;overflow:hidden" title="${f.symbol}">
+        <div style="width:${(f.fill_pct * 100).toFixed(1)}%;height:100%" class="fill-${f.status}"></div>
+      </div>`
+      )
+      .join('')
   }
 
   renderLatestTransactions(txs, incremental) {
@@ -232,6 +247,22 @@ export default class extends Controller {
     this.devFundTarget.innerHTML = humanize.decimalParts(treasuryTotal / 100000000, true, 0)
     this.hashrateTarget.innerHTML = humanize.decimalParts(ex.hash_rate, false, 8, 2)
     this.hashrateDeltaTarget.innerHTML = humanize.fmtPercentage(ex.hash_rate_change_month)
+
+    if (this.hasSkaVoteRewardsTarget && ex.ska_vote_rewards && ex.ska_vote_rewards.length) {
+      this.skaVoteRewardsTarget.innerHTML = ex.ska_vote_rewards
+        .map((r) => {
+          const dot = r.per_block.indexOf('.')
+          const sig = dot >= 0 ? r.per_block.slice(0, dot + 3) : r.per_block
+          const rest = dot >= 0 ? r.per_block.slice(dot + 3) : ''
+          return `<div class="mono lh1rem fs14-decimal fs24 pt-1 pb-1 d-flex align-items-baseline">
+          <span>${sig}<span class="fs13 opacity-50">${rest}</span></span>
+          <span class="ps-1 unit lh15rem" style="font-size:13px;">${r.symbol}/VAR per last block</span>
+        </div>
+        <div class="fs12 lh1rem text-black-50">${r.per_30_days} ${r.symbol}/VAR per 30 days</div>
+        <div class="fs12 lh1rem text-black-50">${r.per_year} ${r.symbol}/VAR per year</div>`
+        })
+        .join('')
+    }
 
     if (ex.exchange_rate) {
       const xcRate = ex.exchange_rate.value

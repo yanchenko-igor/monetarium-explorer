@@ -9,7 +9,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -20,6 +22,7 @@ import (
 	"github.com/monetarium/monetarium-node/txscript/stdscript"
 	"github.com/monetarium/monetarium-node/wire"
 
+	apitypes "github.com/monetarium/monetarium-explorer/api/types"
 	"github.com/monetarium/monetarium-explorer/blockdata"
 	"github.com/monetarium/monetarium-explorer/db/dbtypes"
 	exptypes "github.com/monetarium/monetarium-explorer/explorer/types"
@@ -50,6 +53,8 @@ type DataSource interface {
 	GetChainParams() *chaincfg.Params
 	BlockSubsidy(ctx context.Context, height int64, voters uint16) *chainjson.GetBlockSubsidyResult
 	Difficulty(ctx context.Context, timestamp int64) float64
+	Height() int64
+	GetSummaryRange(ctx context.Context, idx0, idx1 int) []*apitypes.BlockDataBasic
 }
 
 // State represents the current state of block chain.
@@ -699,8 +704,13 @@ func (psh *PubSubHub) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgBl
 
 	posSubsPerVote := dcrutil.Amount(blockData.ExtraInfo.NextBlockSubsidy.PoS).ToCoin() /
 		float64(psh.params.TicketsPerBlock)
-	p.GeneralInfo.TicketReward = 100 * posSubsPerVote /
-		blockData.CurrentStakeDiff.CurrentStakeDifficulty
+	ticketRewardPct := 100 * posSubsPerVote / blockData.CurrentStakeDiff.CurrentStakeDifficulty
+	p.GeneralInfo.TicketReward = ticketRewardPct
+	p.GeneralInfo.VoteVARReward = exptypes.VoteVARReward{
+		PerBlock:  posSubsPerVote / blockData.CurrentStakeDiff.CurrentStakeDifficulty,
+		Per30Days: ticketRewardPct,
+		PerYear:   p.GeneralInfo.ASR, // ASR not recomputed in pubsub path; use last known value
+	}
 
 	// The actual reward of a ticket needs to also take into consideration the
 	// ticket maturity (time from ticket purchase until its eligible to vote)
@@ -712,6 +722,49 @@ func (psh *PubSubHub) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgBl
 	p.GeneralInfo.RewardPeriod = fmt.Sprintf("%.2f days", float64(avgSSTxToSSGenMaturity)*
 		psh.params.TargetTimePerBlock.Hours()/24)
 	//p.GeneralInfo.ASR = ASR
+
+	// Compute per-SKA vote rewards from SSFee totals in this block.
+	sbits, _ := dcrutil.NewAmount(blockData.Header.SBits)
+	ticketPriceAtoms := int64(sbits)
+	voters := int64(blockData.Header.Voters)
+	if ticketPriceAtoms > 0 && voters > 0 && len(blockData.ExtraInfo.SSFeeTotalsByCoin) > 0 {
+		blocksIn30Days := int(30 * 24 * time.Hour / psh.params.TargetTimePerBlock)
+		tip := int(psh.sourceBase.Height())
+		start30 := tip - blocksIn30Days
+		if start30 < 0 {
+			start30 = 0
+		}
+		startYear := tip - blocksIn30Days*12
+		if startYear < 0 {
+			startYear = 0
+		}
+		toSummaries := func(blocks []*apitypes.BlockDataBasic) []txhelpers.SSFeeSummary {
+			s := make([]txhelpers.SSFeeSummary, len(blocks))
+			for i, b := range blocks {
+				s[i] = txhelpers.SSFeeSummary{SSFeeTotalsByCoin: b.SSFeeTotalsByCoin, StakeDiff: b.StakeDiff}
+			}
+			return s
+		}
+		sum30 := toSummaries(psh.sourceBase.GetSummaryRange(ctx, start30, tip))
+		sumYear := toSummaries(psh.sourceBase.GetSummaryRange(ctx, startYear, tip))
+		rewards := make([]exptypes.SKAVoteReward, 0, len(blockData.ExtraInfo.SSFeeTotalsByCoin))
+		for ct, totalStr := range blockData.ExtraInfo.SSFeeTotalsByCoin {
+			total, ok := new(big.Int).SetString(totalStr, 10)
+			if !ok {
+				continue
+			}
+			perVote := new(big.Int).Div(total, big.NewInt(voters))
+			rewards = append(rewards, exptypes.SKAVoteReward{
+				CoinType:  ct,
+				Symbol:    fmt.Sprintf("SKA-%d", ct),
+				PerBlock:  txhelpers.FormatSKAPerVAR(perVote, ticketPriceAtoms),
+				Per30Days: txhelpers.AvgSSFeeRate(sum30, ct, psh.params.TicketsPerBlock),
+				PerYear:   txhelpers.AvgSSFeeRate(sumYear, ct, psh.params.TicketsPerBlock),
+			})
+		}
+		sort.Slice(rewards, func(i, j int) bool { return rewards[i].CoinType < rewards[j].CoinType })
+		p.GeneralInfo.SKAVoteRewards = rewards
+	}
 
 	p.mtx.Unlock()
 

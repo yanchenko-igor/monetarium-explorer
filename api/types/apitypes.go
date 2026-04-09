@@ -728,6 +728,8 @@ type BlockDataBasic struct {
 	CoinAmounts map[uint8]string `json:"coin_amounts,omitempty"`
 	// CoinTxStats holds per-coin tx count and size (key 0=VAR, 1-255=SKA-n).
 	CoinTxStats map[uint8]CoinTxStats `json:"coin_tx_stats,omitempty"`
+	// SSFeeTotalsByCoin holds total SKA atoms distributed via TxTypeSSFee per coin type.
+	SSFeeTotalsByCoin map[uint8]string `json:"ssfee_totals,omitempty"`
 	// TicketPoolInfo may be nil for side chain blocks.
 	PoolInfo *TicketPoolInfo `json:"ticket_pool,omitempty"`
 }
@@ -762,6 +764,8 @@ type BlockExplorerExtraInfo struct {
 	CoinAmounts map[uint8]string `json:"coin_amounts,omitempty"`
 	// CoinTxStats holds per-coin tx count and size (key 0=VAR, 1-255=SKA-n).
 	CoinTxStats map[uint8]CoinTxStats `json:"coin_tx_stats,omitempty"`
+	// SSFeeTotalsByCoin holds total SKA atoms distributed via TxTypeSSFee per coin type.
+	SSFeeTotalsByCoin map[uint8]string `json:"ssfee_totals,omitempty"`
 }
 
 // BlockTransactionCounts contains the regular and stake transaction counts for
