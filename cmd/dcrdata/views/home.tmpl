@@ -105,6 +105,31 @@
                             </div>
                             <div class="fs12 lh1rem text-black-50" title="Annual Stake Rewards">{{printf "%.2f" .ASR}}% per year</div>
                         </div>
+                        {{if .SKAVoteRewards}}
+                        <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
+                            <div class="fs13 text-secondary">Vote SKA Reward</div>
+                            <div data-homepage-target="skaVoteRewards">
+                            {{range .SKAVoteRewards}}
+                                {{$parts := skaSplit .PerBlock}}
+                                <div class="mono lh1rem fs14-decimal fs24 pt-1 pb-1 d-flex align-items-baseline">
+                                    {{if .PerBlock -}}
+                                    <span>{{index $parts 0}}.{{index $parts 1}}<span class="fs13 opacity-50">{{index $parts 2}}</span></span>
+                                    {{- else -}}
+                                    <span>&mdash;</span>
+                                    {{- end}}
+                                    <span class="ps-1 unit lh15rem" style="font-size:13px;">{{.Symbol}}/VAR per last block</span>
+                                </div>
+                                <div class="fs12 lh1rem text-black-50">{{.Per30Days}} {{.Symbol}}/VAR per 30 days</div>
+                                <div class="fs12 lh1rem text-black-50">{{.PerYear}} {{.Symbol}}/VAR per year</div>
+                            {{end}}
+                            </div>
+                        </div>
+                        {{else}}
+                        <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3" style="display:none">
+                            <div class="fs13 text-secondary">Vote SKA Reward</div>
+                            <div data-homepage-target="skaVoteRewards"></div>
+                        </div>
+                        {{end}}
                         <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
                             <div class="fs13 text-secondary"><a href="/charts?chart=stake-participation">Total Staked DCR</a></div>
                             <div class="mono lh1rem fs14-decimal fs24 pt-1 pb-1 d-flex align-items-baseline">

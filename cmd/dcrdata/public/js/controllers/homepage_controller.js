@@ -249,19 +249,30 @@ export default class extends Controller {
     this.hashrateDeltaTarget.innerHTML = humanize.fmtPercentage(ex.hash_rate_change_month)
 
     if (this.hasSkaVoteRewardsTarget && ex.ska_vote_rewards && ex.ska_vote_rewards.length) {
+      const wrapper = this.skaVoteRewardsTarget.closest('.col-12')
+      if (wrapper) wrapper.style.display = ''
       this.skaVoteRewardsTarget.innerHTML = ex.ska_vote_rewards
         .map((r) => {
-          const dot = r.per_block.indexOf('.')
-          const sig = dot >= 0 ? r.per_block.slice(0, dot + 3) : r.per_block
-          const rest = dot >= 0 ? r.per_block.slice(dot + 3) : ''
+          let perBlockHtml
+          if (r.per_block) {
+            const dot = r.per_block.indexOf('.')
+            const sig = dot >= 0 ? r.per_block.slice(0, dot + 3) : r.per_block
+            const rest = dot >= 0 ? r.per_block.slice(dot + 3) : ''
+            perBlockHtml = `<span>${sig}<span class="fs13 opacity-50">${rest}</span></span>
+            <span class="ps-1 unit lh15rem" style="font-size:13px;">${r.symbol}/VAR per last block</span>`
+          } else {
+            perBlockHtml = `<span>\u2014</span>
+            <span class="ps-1 unit lh15rem" style="font-size:13px;">${r.symbol}/VAR per last block</span>`
+          }
           return `<div class="mono lh1rem fs14-decimal fs24 pt-1 pb-1 d-flex align-items-baseline">
-          <span>${sig}<span class="fs13 opacity-50">${rest}</span></span>
-          <span class="ps-1 unit lh15rem" style="font-size:13px;">${r.symbol}/VAR per last block</span>
+          ${perBlockHtml}
         </div>
         <div class="fs12 lh1rem text-black-50">${r.per_30_days} ${r.symbol}/VAR per 30 days</div>
         <div class="fs12 lh1rem text-black-50">${r.per_year} ${r.symbol}/VAR per year</div>`
         })
         .join('')
+    } else if (this.hasSkaVoteRewardsTarget) {
+      this.skaVoteRewardsTarget.innerHTML = ''
     }
 
     if (ex.exchange_rate) {
