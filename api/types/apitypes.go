@@ -766,6 +766,8 @@ type BlockExplorerExtraInfo struct {
 	CoinTxStats map[uint8]CoinTxStats `json:"coin_tx_stats,omitempty"`
 	// SSFeeTotalsByCoin holds total SKA atoms distributed via TxTypeSSFee per coin type.
 	SSFeeTotalsByCoin map[uint8]string `json:"ssfee_totals,omitempty"`
+	// SKAPoWRewards holds per-SKA-type PoW mining reward amounts (atom strings) from the block's coinbase.
+	SKAPoWRewards map[uint8]string `json:"ska_pow_rewards,omitempty"`
 }
 
 // BlockTransactionCounts contains the regular and stake transaction counts for

@@ -156,6 +156,18 @@
                             </div>
                             {{- end}}
                         </div>
+                        {{if .PoWSKARewards}}
+                        <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
+                            <div class="fs13 text-secondary">PoW SKA Reward</div>
+                            {{range .PoWSKARewards}}
+                            <div class="mono lh1rem p03rem0 fs14-decimal fs24 p03rem0 d-flex align-items-baseline">
+                                <span class="pe-1">{{.Symbol}}:</span>
+                                <span>{{template "decimalParts" (skaDecimalParts .Amount true 2)}}</span>
+                                <span class="ps-1 unit lh15rem">{{.Symbol}}</span>
+                            </div>
+                            {{end}}
+                        </div>
+                        {{end}}
                         <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
                             <div class="fs13 text-secondary lh1rem">Next Block Reward Reduction</div>
                             <div class="progress mt-1 mb-1">

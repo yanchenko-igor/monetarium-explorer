@@ -172,6 +172,58 @@ func float64Formatting(v float64, numPlaces int, useCommas bool, boldNumPlaces .
 	return []string{integer, dec[:places], dec[places:], trailingZeros}
 }
 
+// skaDecimalParts converts a SKA atom string (decimal integer string, 18 decimals)
+// to the []string format expected by the "decimalParts" template.
+// Returns [integer, decimal, trailingZeros] or with boldNumPlaces:
+// [integer, firstNdec, restDec, trailingZeros].
+func skaDecimalParts(atomStr string, useCommas bool, boldNumPlaces ...int) []string {
+	if atomStr == "" {
+		return []string{"0", "", ""}
+	}
+
+	// Parse the atom value.
+	atoms, ok := new(big.Int).SetString(atomStr, 10)
+	if !ok {
+		return []string{atomStr, "", ""}
+	}
+
+	if atoms.Sign() == 0 {
+		return []string{"0", "", ""}
+	}
+
+	// SKA has 18 decimal places.
+	skaDecimals := 18
+	scale := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(skaDecimals)), nil)
+
+	intPart := new(big.Int).Div(atoms, scale)
+	fracPart := new(big.Int).Mod(atoms, scale)
+
+	integer := intPart.String()
+	dec := fmt.Sprintf("%018d", fracPart.Int64())
+
+	// Trim trailing zeros and track them separately.
+	right := strings.TrimRight(dec, "0")
+	trailingZeros := strings.Repeat("0", len(dec)-len(right))
+
+	if useCommas && intPart.Sign() > 0 {
+		integer = humanize.Comma(intPart.Int64())
+	}
+
+	if len(boldNumPlaces) == 0 {
+		return []string{integer, right, trailingZeros}
+	}
+
+	places := boldNumPlaces[0]
+	if places > len(right) {
+		places = len(right)
+	}
+	if places == 0 {
+		return []string{integer, right, trailingZeros}
+	}
+
+	return []string{integer, right[:places], right[places:], trailingZeros}
+}
+
 func amountAsDecimalPartsTrimmed(v, numPlaces int64, useCommas bool) []string {
 	// Filter numPlaces to only allow up to 8 decimal places trimming (eg. 1.12345678)
 	if numPlaces > 8 {
@@ -478,6 +530,9 @@ func makeTemplateFuncMap(params *chaincfg.Params) template.FuncMap {
 		},
 		"toFloat64Amount": func(intAmount int64) float64 {
 			return dcrutil.Amount(intAmount).ToCoin()
+		},
+		"skaDecimalParts": func(atomStr string, useCommas bool, boldNumPlaces ...int) []string {
+			return skaDecimalParts(atomStr, useCommas, boldNumPlaces...)
 		},
 		"dcrPerKbToAtomsPerByte": func(amt dcrutil.Amount) int64 {
 			return int64(math.Round(float64(amt) / 1e3))

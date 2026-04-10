@@ -578,6 +578,13 @@ type VoteVARReward struct {
 	PerYear   float64 `json:"per_year"`    // annualised percentage (ASR)
 }
 
+// PoWSKAReward holds the PoW mining reward for a single SKA coin type.
+type PoWSKAReward struct {
+	CoinType uint8  `json:"coin_type"`
+	Symbol   string `json:"symbol"`
+	Amount   string `json:"amount"` // SKA atoms as decimal string (18 decimals)
+}
+
 // HomeInfo represents data used for the home page
 type HomeInfo struct {
 	CoinSupply            int64                    `json:"coin_supply"`
@@ -605,6 +612,7 @@ type HomeInfo struct {
 	ExchangeRate          *Conversion              `json:"exchange_rate,omitempty"`
 	VoteVARReward         VoteVARReward            `json:"vote_var_reward"`
 	SKAVoteRewards        []SKAVoteReward          `json:"ska_vote_rewards,omitempty"`
+	PoWSKARewards         []PoWSKAReward           `json:"pow_ska_rewards,omitempty"`
 }
 
 // BlockSubsidy is an implementation of chainjson.GetBlockSubsidyResult

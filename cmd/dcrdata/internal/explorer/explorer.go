@@ -638,6 +638,20 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 		p.HomeInfo.SKAVoteRewards = rewards
 	}
 
+	// PoW SKA rewards: per-SKA-type mining reward amounts from the coinbase.
+	if len(blockData.ExtraInfo.SKAPoWRewards) > 0 {
+		powRewards := make([]types.PoWSKAReward, 0, len(blockData.ExtraInfo.SKAPoWRewards))
+		for ct, amountStr := range blockData.ExtraInfo.SKAPoWRewards {
+			powRewards = append(powRewards, types.PoWSKAReward{
+				CoinType: ct,
+				Symbol:   fmt.Sprintf("SKA-%d", ct),
+				Amount:   amountStr,
+			})
+		}
+		sort.Slice(powRewards, func(i, j int) bool { return powRewards[i].CoinType < powRewards[j].CoinType })
+		p.HomeInfo.PoWSKARewards = powRewards
+	}
+
 	// If exchange monitoring is enabled, set the exchange rate.
 	if exp.xcBot != nil {
 		exchangeConversion := exp.xcBot.Conversion(1.0)

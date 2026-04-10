@@ -258,6 +258,11 @@ func (t *Collector) CollectBlockInfo(hash *chainhash.Hash) (*apitypes.BlockDataB
 		extrainfo.SSFeeTotalsByCoin = ssfee
 	}
 
+	// Extract per-SKA-type PoW mining reward amounts from the coinbase.
+	if skaRewards := blockSKAPoWRewards(msgBlock); len(skaRewards) > 0 {
+		extrainfo.SKAPoWRewards = skaRewards
+	}
+
 	return blockdata, feeInfoBlock, blockHeaderResults, extrainfo, msgBlock, err
 }
 
@@ -451,6 +456,38 @@ func blockCoinAmounts(msgBlock *wire.MsgBlock) map[uint8]string {
 		out[0] = fmt.Sprintf("%d", varTotal)
 	}
 	for k, v := range skaTotal {
+		out[k] = v.String()
+	}
+	return out
+}
+
+// blockSKAPoWRewards extracts per-SKA-type PoW mining reward amounts from the
+// coinbase transaction of a block. Only SKA outputs (CoinType 1-255) from the
+// coinbase are considered, as those represent the miner's SKA reward.
+func blockSKAPoWRewards(msgBlock *wire.MsgBlock) map[uint8]string {
+	if len(msgBlock.Transactions) == 0 {
+		return nil
+	}
+	coinbase := msgBlock.Transactions[0]
+	skaRewards := make(map[uint8]*big.Int)
+
+	for _, txout := range coinbase.TxOut {
+		if txout.CoinType.IsSKA() && txout.SKAValue != nil {
+			ct := uint8(txout.CoinType)
+			if cur, ok := skaRewards[ct]; ok {
+				cur.Add(cur, txout.SKAValue)
+			} else {
+				skaRewards[ct] = new(big.Int).Set(txout.SKAValue)
+			}
+		}
+	}
+
+	if len(skaRewards) == 0 {
+		return nil
+	}
+
+	out := make(map[uint8]string, len(skaRewards))
+	for k, v := range skaRewards {
 		out[k] = v.String()
 	}
 	return out
