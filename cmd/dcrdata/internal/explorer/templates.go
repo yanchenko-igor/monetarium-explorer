@@ -172,6 +172,58 @@ func float64Formatting(v float64, numPlaces int, useCommas bool, boldNumPlaces .
 	return []string{integer, dec[:places], dec[places:], trailingZeros}
 }
 
+// skaDecimalParts converts a SKA atom string (decimal integer string, 18 decimals)
+// to the []string format expected by the "decimalParts" template.
+// Returns [integer, decimal, trailingZeros] or with boldNumPlaces:
+// [integer, firstNdec, restDec, trailingZeros].
+func skaDecimalParts(atomStr string, useCommas bool, boldNumPlaces ...int) []string {
+	if atomStr == "" {
+		return []string{"0", "", ""}
+	}
+
+	// Parse the atom value.
+	atoms, ok := new(big.Int).SetString(atomStr, 10)
+	if !ok {
+		return []string{atomStr, "", ""}
+	}
+
+	if atoms.Sign() == 0 {
+		return []string{"0", "", ""}
+	}
+
+	// SKA has 18 decimal places.
+	skaDecimals := 18
+	scale := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(skaDecimals)), nil)
+
+	intPart := new(big.Int).Div(atoms, scale)
+	fracPart := new(big.Int).Mod(atoms, scale)
+
+	integer := intPart.String()
+	dec := fmt.Sprintf("%018d", fracPart.Int64())
+
+	// Trim trailing zeros and track them separately.
+	right := strings.TrimRight(dec, "0")
+	trailingZeros := strings.Repeat("0", len(dec)-len(right))
+
+	if useCommas && intPart.Sign() > 0 {
+		integer = humanize.Comma(intPart.Int64())
+	}
+
+	if len(boldNumPlaces) == 0 {
+		return []string{integer, right, trailingZeros}
+	}
+
+	places := boldNumPlaces[0]
+	if places > len(right) {
+		places = len(right)
+	}
+	if places == 0 {
+		return []string{integer, right, trailingZeros}
+	}
+
+	return []string{integer, right[:places], right[places:], trailingZeros}
+}
+
 func amountAsDecimalPartsTrimmed(v, numPlaces int64, useCommas bool) []string {
 	// Filter numPlaces to only allow up to 8 decimal places trimming (eg. 1.12345678)
 	if numPlaces > 8 {
@@ -369,6 +421,36 @@ func formattedDuration(duration time.Duration, str *periodMap) string {
 	return i(durationsec) + pl(str.s, durationsec)
 }
 
+// skaSplitParts converts a pre-formatted SKA decimal string into the 4-element
+// []string format expected by the "decimalParts" template:
+// [integer, boldDecimals, restDecimals, trailingZeros].
+// boldPlaces controls how many decimal digits are rendered at full weight
+// (matching the boldNumPlaces argument of float64Formatting). Defaults to 2.
+// Trailing zeros are separated from the significant decimal digits so the
+// "decimal trailing-zeroes" CSS class can dim them, identical to VAR rendering.
+func skaSplitParts(s string, boldPlaces int) []string {
+	dot := strings.IndexByte(s, '.')
+	if dot < 0 {
+		return []string{s, "", "", ""}
+	}
+	integer := s[:dot]
+	frac := s[dot+1:]
+
+	// Separate trailing zeros from significant decimal digits.
+	trimmed := strings.TrimRight(frac, "0")
+	trailingZeros := strings.Repeat("0", len(frac)-len(trimmed))
+
+	// Split trimmed decimals into bold prefix and dimmed rest.
+	bold := trimmed
+	rest := ""
+	if len(trimmed) > boldPlaces {
+		bold = trimmed[:boldPlaces]
+		rest = trimmed[boldPlaces:]
+	}
+
+	return []string{integer, bold, rest, trailingZeros}
+}
+
 func makeTemplateFuncMap(params *chaincfg.Params) template.FuncMap {
 	netTheme := "theme-" + strings.ToLower(netName(params))
 	netName := netName(params)
@@ -384,20 +466,7 @@ func makeTemplateFuncMap(params *chaincfg.Params) template.FuncMap {
 		"txtypeStr": func(txtype int) string {
 			return txhelpers.TxTypeToString(txtype)
 		},
-		// skaSplit splits a fixed-point decimal string (e.g. "0.060682851693627761")
-		// into [intPart, firstTwoDecimals, restDecimals].
-		"skaSplit": func(s string) [3]string {
-			dot := strings.IndexByte(s, '.')
-			if dot < 0 {
-				return [3]string{s, "", ""}
-			}
-			intPart := s[:dot]
-			frac := s[dot+1:]
-			if len(frac) <= 2 {
-				return [3]string{intPart, frac, ""}
-			}
-			return [3]string{intPart, frac[:2], frac[2:]}
-		},
+		"skaSplitParts": func(s string) []string { return skaSplitParts(s, 2) },
 		"add": func(args ...int64) int64 {
 			var sum int64
 			for _, a := range args {
@@ -478,6 +547,9 @@ func makeTemplateFuncMap(params *chaincfg.Params) template.FuncMap {
 		},
 		"toFloat64Amount": func(intAmount int64) float64 {
 			return dcrutil.Amount(intAmount).ToCoin()
+		},
+		"skaDecimalParts": func(atomStr string, useCommas bool, boldNumPlaces ...int) []string {
+			return skaDecimalParts(atomStr, useCommas, boldNumPlaces...)
 		},
 		"dcrPerKbToAtomsPerByte": func(amt dcrutil.Amount) int64 {
 			return int64(math.Round(float64(amt) / 1e3))
