@@ -87,7 +87,7 @@
             <div class="fs13 text-secondary">Vote SKA Reward</div>
             <div data-homepage-target="skaVoteRewards">
                 {{if $page.Info.SKAVoteRewards}}{{range $page.Info.SKAVoteRewards}}
-                <div class="mono lh1rem fs14-decimal fs24 pt-1 pb-1 d-flex align-items-baseline">
+                <div class="mono lh1rem fs14-decimal fs24 pt-1 pb-1 d-flex flex-column flex-lg-row align-items-baseline">
                     {{template "decimalParts" (skaSplitParts .PerBlock)}}
                     <span class="ps-1 unit lh15rem fs13">{{.Symbol}}/VAR per last block</span>
                 </div>
