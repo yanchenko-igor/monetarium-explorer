@@ -4,8 +4,8 @@
 <html lang="en">
 {{ template "html-head" headData .CommonPageData "Monetarium Block Explorer"}}
     {{ template "navbar" . }}
-    <div class="container main" data-controller="time blocklist homepage mining distribution voting"
-         data-action="homepage:block->mining#handleBlock homepage:block->distribution#handleBlock homepage:block->voting#handleBlock">
+    <div class="container main" data-controller="time blocklist homepage mining supply voting"
+         data-action="homepage:block->mining#handleBlock homepage:block->supply#handleBlock homepage:block->voting#handleBlock">
         <div class="row">
             <div class="d-flex flex-column col-md-15 p-0">
                 <div class="bg-white mb-1 py-2 px-3 my-0">
@@ -40,7 +40,7 @@
                         <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
                             <div class="fs13 text-secondary">VAR Circulating Supply</div>
                             <div class="mono lh1rem fs14-decimal fs24 p03rem0 d-flex align-items-baseline">
-                                <span data-distribution-target="varCirculating">
+                                <span data-supply-target="varCirculating">
                                     {{formatCoinAtoms .VARCoinSupply.Circulating 0}}
                                 </span>
                                 <span class="ps-1 unit lh15rem">VAR</span>
@@ -67,7 +67,7 @@
                                 <a class="no-underline" href="/market">Exchange Rate</a>
                             </div>
                             <div class="mono lh1rem fs14-decimal fs24 p03rem0 d-flex align-items-baseline">
-                                <span class="d-inline-block" data-distribution-target="exchangeRate">{{$conv.ExchangeRate.TwoDecimals}}</span>
+                                <span class="d-inline-block" data-supply-target="exchangeRate">{{$conv.ExchangeRate.TwoDecimals}}</span>
                                 <span class="ps-1 unit lh15rem">{{$conv.ExchangeRate.Index}}</span>
                             </div>
                         </div>
