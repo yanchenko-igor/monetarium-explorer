@@ -44,9 +44,8 @@
             <div data-mining-target="powSkaRewards">
             {{range .PoWSKARewards}}
             <div class="mono lh1rem p03rem0 fs14-decimal fs24 p03rem0 d-flex align-items-baseline">
-                <span class="pe-1">{{.Symbol}}:</span>
                 <span>{{template "decimalParts" (skaDecimalParts .Amount true 2)}}</span>
-                <span class="ps-1 unit lh15rem">{{.Symbol}}</span>
+                <span class="ps-1 unit lh15rem">{{.Symbol}} <span class="text-black-50 ms-1 fs12">per last block</span></span>
             </div>
             {{end}}
             </div>
@@ -62,15 +61,14 @@
         {{/* Template for JS live-update cloning */}}
         <template id="pow-ska-reward-template">
             <div class="mono lh1rem p03rem0 fs14-decimal fs24 p03rem0 d-flex align-items-baseline">
-                <span class="pe-1 symbol"></span>
                 <div class="decimal-parts d-inline-block">
                     <span class="int"></span><span class="decimal"></span><span class="decimal trailing-zeroes"></span>
                 </div>
-                <span class="ps-1 unit lh15rem symbol"></span>
+                <span class="ps-1 unit lh15rem"><span class="symbol"></span> <span class="text-black-50 ms-1 fs12">per last block</span></span>
             </div>
         </template>
         <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
-            <div class="fs13 text-secondary lh1rem">Next Block Reward Reduction</div>
+            <div class="fs13 text-secondary lh1rem">Next Block VAR Reward Reduction</div>
             <div class="progress mt-1 mb-1">
                 <div
                     class="progress-bar rounded"
