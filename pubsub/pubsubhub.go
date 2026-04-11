@@ -772,6 +772,22 @@ func (psh *PubSubHub) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgBl
 		p.GeneralInfo.SKAVoteRewards = nil
 	}
 
+	// PoW SKA rewards: per-SKA-type mining reward amounts from the coinbase.
+	if len(blockData.ExtraInfo.SKAPoWRewards) > 0 {
+		powRewards := make([]exptypes.PoWSKAReward, 0, len(blockData.ExtraInfo.SKAPoWRewards))
+		for ct, amountStr := range blockData.ExtraInfo.SKAPoWRewards {
+			powRewards = append(powRewards, exptypes.PoWSKAReward{
+				CoinType: ct,
+				Symbol:   fmt.Sprintf("SKA-%d", ct),
+				Amount:   amountStr,
+			})
+		}
+		sort.Slice(powRewards, func(i, j int) bool { return powRewards[i].CoinType < powRewards[j].CoinType })
+		p.GeneralInfo.PoWSKARewards = powRewards
+	} else {
+		p.GeneralInfo.PoWSKARewards = nil
+	}
+
 	p.mtx.Unlock()
 
 	// Signal to the websocket hub that a new block was received, but do not

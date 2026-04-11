@@ -1,5 +1,6 @@
 import { Controller } from '@hotwired/stimulus'
 import humanize from '../helpers/humanize_helper'
+import { splitSkaAtoms } from '../helpers/ska_helper'
 
 export default class extends Controller {
   static get targets() {
@@ -10,7 +11,8 @@ export default class extends Controller {
       'bsubsidyPow',
       'powConverted',
       'powBar',
-      'rewardIdx'
+      'rewardIdx',
+      'powSkaRewards'
     ]
   }
 
@@ -32,5 +34,37 @@ export default class extends Controller {
       const { value: xcRate, index } = ex.exchange_rate
       this.powConvertedTarget.textContent = `${humanize.twoDecimals((ex.subsidy.pow / 1e8) * xcRate)} ${index}`
     }
+
+    this._renderPoWSkaRewards(ex.pow_ska_rewards)
+  }
+
+  _renderPoWSkaRewards(rewards) {
+    if (!this.hasPowSkaRewardsTarget) return
+    const tmpl = document.getElementById('pow-ska-reward-template')
+    if (!tmpl) return
+
+    const container = this.powSkaRewardsTarget
+    container.innerHTML = ''
+
+    if (!Array.isArray(rewards) || rewards.length === 0) return
+
+    rewards.forEach((r) => {
+      const clone = document.importNode(tmpl.content, true)
+      const { intPart, bold, rest, trailingZeros } = splitSkaAtoms(r.amount || '')
+
+      const intEl = clone.querySelector('.int')
+      const decEl = clone.querySelector('.decimal:not(.trailing-zeroes)')
+      const trailEl = clone.querySelector('.trailing-zeroes')
+
+      if (intEl) intEl.textContent = bold ? `${intPart}.${bold}` : intPart
+      if (decEl) decEl.textContent = rest
+      if (trailEl) trailEl.textContent = trailingZeros
+
+      clone.querySelectorAll('.symbol').forEach((el) => {
+        el.textContent = r.symbol
+      })
+
+      container.appendChild(clone)
+    })
   }
 }
