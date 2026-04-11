@@ -1238,3 +1238,44 @@ Tests:
 Demo: Block /block/68032b6621... shows all 9 stake transactions (5 votes, 1 revocation, 3 stake fees). Homepage shows "Vote SKA Reward" with per-SKA rows for last block,
 30-day, and yearly rates.
 
+Task 21: Home page Supply section with VAR and SKA supply data
+Commit: feat: add new Supply section with VARCoinSupply and SKACoinSupply data
+Objective: Replace the legacy Distribution section on the home page with a new Supply section that shows VAR circulating supply with target cap and per-SKA-type supply data (InCirculation, TotalIssued, TotalBurned).
+---
+Types — explorer/types/explorertypes.go:
+Add VARCoinSupply struct:
+type VARCoinSupply struct {
+    Circulating string // 15+18 decimal string (from RPC)
+    Target      string // from chain params.MaxSupply (exact value)
+}
+Add SKACoinSupplyEntry struct:
+type SKACoinSupplyEntry struct {
+    CoinType       uint8  // SKA-n identifier (1, 2, ...)
+    InCirculation  string // big.Int atom string
+    TotalIssued    string // big.Int atom string
+    TotalBurned    string // big.Int atom string (placeholder: "0")
+}
+Modify HomeInfo — add VARCoinSupply and SKACoinSupply fields; remove legacy DevFund, DevAddress, TreasuryBalance fields (Decred treasury).
+---
+Database — db/dcrpg/pgblockchain.go:
+Add SKACoinSupply(ctx context.Context) ([]*types.SKACoinSupplyEntry, error):
+SELECT coin_type, sum(value) FROM vouts WHERE is_mainchain AND coin_type > 0 GROUP BY coin_type
+Convert sums to atom strings (18 decimals for SKA). TotalBurned = "0" (placeholder). InCirculation = TotalIssued - TotalBurned.
+---
+Explorer data source — cmd/dcrdata/internal/explorer/explorer.go:
+Add to explorerDataSource interface:
+VARCoinSupply(ctx context.Context) (*types.VARCoinSupply, error)
+SKACoinSupply(ctx context.Context) ([]*types.SKACoinSupplyEntry, error)
+Implement in ChainDB wrapper.
+In Store() — populate HomeInfo.VARCoinSupply from blockData.ExtraInfo.CoinSupply (RPC) + chain params.MaxSupply; populate HomeInfo.SKACoinSupply from new SKACoinSupply().
+---
+Template — cmd/dcrdata/views/home.tmpl:
+Replace Supply section (currently lines 107-168):
+- VAR Circulating from VARCoinSupply.Circulating
+- VAR Target Cap from VARCoinSupply.Target (exact from chain params)
+- SKA rows: TokenType, InCirculation, TotalIssued, TotalBurned
+- Remove "Treasury Block Reward" card (Decred legacy)
+Use existing formatting helpers (already handle big.Int strings).
+---
+Test: go build ./cmd/dcrdata/... passes. Template renders without error for 0, 1, and 2 SKA types.
+Demo: Homepage Supply section shows VAR circulating (~X million) and target cap (~5 million VAR), plus SKA-1 row with InCirculation, TotalIssued, TotalBurned values.

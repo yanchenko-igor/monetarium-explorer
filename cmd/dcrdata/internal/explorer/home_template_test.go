@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/monetarium/monetarium-explorer/db/dbtypes"
 	"github.com/monetarium/monetarium-explorer/explorer/types"
 	"github.com/monetarium/monetarium-node/chaincfg"
 )
@@ -60,7 +59,7 @@ func TestHomeTemplate_IndicatorList(t *testing.T) {
 		PercentChange float64
 	}{
 		CommonPageData: &CommonPageData{Links: &links{}, Tip: &types.WebBasicBlock{}},
-		Info:           &types.HomeInfo{TreasuryBalance: &dbtypes.TreasuryBalance{}},
+		Info:           &types.HomeInfo{},
 		Mempool:        makeTestMempool(0.42, 1, fills),
 		BestBlock:      makeTestBlock(100, nil),
 		Blocks:         []*types.BlockBasic{makeTestBlock(100, nil)},
@@ -118,7 +117,7 @@ func TestHomeTemplate_IndicatorList_NoJSOnly(t *testing.T) {
 		PercentChange float64
 	}{
 		CommonPageData: &CommonPageData{Links: &links{}, Tip: &types.WebBasicBlock{}},
-		Info:           &types.HomeInfo{TreasuryBalance: &dbtypes.TreasuryBalance{}},
+		Info:           &types.HomeInfo{},
 		Mempool:        makeTestMempool(0.0, 0, nil),
 		BestBlock:      makeTestBlock(1, nil),
 		Blocks:         []*types.BlockBasic{makeTestBlock(1, nil)},
@@ -186,7 +185,7 @@ func TestHomeTemplate_BlocksTable(t *testing.T) {
 				PercentChange float64
 			}{
 				CommonPageData: &CommonPageData{Links: &links{}, Tip: &types.WebBasicBlock{}},
-				Info:           &types.HomeInfo{TreasuryBalance: &dbtypes.TreasuryBalance{}},
+				Info:           &types.HomeInfo{},
 				Mempool:        &types.MempoolInfo{},
 				BestBlock:      tc.blocks[0],
 				Blocks:         tc.blocks,
