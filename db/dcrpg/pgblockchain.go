@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"sort"
 	"strings"
 	"sync"
@@ -4841,6 +4842,76 @@ func (pgb *ChainDB) CurrentCoinSupply(ctx context.Context) (supply *apitypes.Coi
 		Mined:    int64(coinSupply),
 		Ultimate: txhelpers.UltimateSubsidy(pgb.chainParams, dcp0010Height, dcp0012Height),
 	}
+}
+
+// SKACoinSupply retrieves the supply info for all SKA coin types.
+// TotalIssued = sum of vouts by coin_type (mainchain).
+// TotalBurned = "0" (placeholder - burn tracking not implemented).
+// InCirculation = TotalIssued - TotalBurned.
+func (pgb *ChainDB) SKACoinSupply(ctx context.Context) ([]*exptypes.SKACoinSupplyEntry, error) {
+	rows, err := pgb.db.QueryContext(ctx, internal.SelectSKACoinSupply)
+	if err != nil {
+		log.Errorf("SKACoinSupply query failed: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var supply []*exptypes.SKACoinSupplyEntry
+	for rows.Next() {
+		var entry exptypes.SKACoinSupplyEntry
+		var valueStr string
+		if err := rows.Scan(&entry.CoinType, &valueStr); err != nil {
+			log.Errorf("SKACoinSupply scan failed: %v", err)
+			return nil, err
+		}
+
+		// Convert numeric string to big.Int to ensure we can pad it correctly
+		atoms := new(big.Int)
+		if _, ok := atoms.SetString(valueStr, 10); !ok {
+			log.Errorf("SKACoinSupply: failed to parse sum %q as big.Int", valueStr)
+		}
+
+		// Format to atom string with at least 18 digits (padding with leading zeros)
+		s := atoms.String()
+		if len(s) < 18 {
+			s = strings.Repeat("0", 18-len(s)) + s
+		}
+
+		entry.TotalIssued = s
+		entry.TotalBurned = "0"
+		entry.InCirculation = s // placeholder: same as TotalIssued
+		supply = append(supply, &entry)
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Errorf("SKACoinSupply rows error: %v", err)
+		return nil, err
+	}
+
+	return supply, nil
+}
+
+// VARCoinSupply retrieves the VAR circulating supply and target cap.
+func (pgb *ChainDB) VARCoinSupply(ctx context.Context) (*exptypes.VARCoinSupply, error) {
+	coinSupply, err := pgb.Client.GetCoinSupply(ctx)
+	if err != nil {
+		log.Errorf("VARCoinSupply RPC failed: %v", err)
+		return nil, err
+	}
+
+	// Circulating: from RPC (int64 atoms, 8 decimals)
+	circulating := fmt.Sprintf("%08d", coinSupply)
+
+	// Target: from UltimateSubsidy (total VAR that will ever be emitted)
+	dcp0010Height := pgb.DCP0010ActivationHeight()
+	dcp0012Height := pgb.DCP0012ActivationHeight()
+	ultimate := txhelpers.UltimateSubsidy(pgb.chainParams, dcp0010Height, dcp0012Height)
+	target := fmt.Sprintf("%08d", ultimate)
+
+	return &exptypes.VARCoinSupply{
+		Circulating: circulating,
+		Target:      target,
+	}, nil
 }
 
 // GetBlockByHash gets a *wire.MsgBlock for the supplied hex-encoded hash

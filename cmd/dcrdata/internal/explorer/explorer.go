@@ -17,7 +17,6 @@ import (
 	"os"
 	"os/signal"
 	"reflect"
-	"runtime"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -121,6 +120,8 @@ type explorerDataSource interface {
 	CurrentDifficulty(context.Context) (float64, error)
 	Difficulty(ctx context.Context, timestamp int64) float64
 	GetSummaryRange(ctx context.Context, idx0, idx1 int) []*apitypes.BlockDataBasic
+	VARCoinSupply(ctx context.Context) (*types.VARCoinSupply, error)
+	SKACoinSupply(ctx context.Context) ([]*types.SKACoinSupplyEntry, error)
 }
 
 type PoliteiaBackend interface {
@@ -357,7 +358,6 @@ func New(cfg *ExplorerConfig) *explorerUI {
 	exp.pageData = &pageData{
 		BlockInfo: new(types.BlockInfo),
 		HomeInfo: &types.HomeInfo{
-			DevAddress: devSubsidyAddress,
 			Params: types.ChainParams{
 				WindowSize:       exp.ChainParams.StakeDiffWindowSize,
 				RewardWindowSize: exp.ChainParams.SubsidyReductionInterval,
@@ -528,12 +528,6 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 		stakePerc = blockData.PoolInfo.Value / dcrutil.Amount(blockData.ExtraInfo.CoinSupply).ToCoin()
 	}
 
-	treasuryBalance, err := exp.dataSource.TreasuryBalance(ctx)
-	if err != nil {
-		log.Errorf("Store: TreasuryBalance failed: %v", err)
-		treasuryBalance = &dbtypes.TreasuryBalance{}
-	}
-
 	// Update pageData with block data and chain (home) info.
 	p := exp.pageData
 	p.Lock()
@@ -554,11 +548,29 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 	p.HomeInfo.IdxBlockInWindow = blockData.IdxBlockInWindow
 	p.HomeInfo.IdxInRewardWindow = int(newBlockData.Height%exp.ChainParams.SubsidyReductionInterval) + 1
 	p.HomeInfo.Difficulty = difficulty
-	p.HomeInfo.TreasuryBalance = treasuryBalance
 	p.HomeInfo.NBlockSubsidy.Dev = blockData.ExtraInfo.NextBlockSubsidy.Developer
 	p.HomeInfo.NBlockSubsidy.PoS = blockData.ExtraInfo.NextBlockSubsidy.PoS
 	p.HomeInfo.NBlockSubsidy.PoW = blockData.ExtraInfo.NextBlockSubsidy.PoW
 	p.HomeInfo.NBlockSubsidy.Total = blockData.ExtraInfo.NextBlockSubsidy.Total
+
+	// New Supply section data
+	varSupply, err := exp.dataSource.VARCoinSupply(ctx)
+	if err != nil {
+		log.Errorf("Store: VARCoinSupply failed: %v", err)
+	} else {
+		p.HomeInfo.VARCoinSupply = varSupply
+	}
+	skaSupply, err := exp.dataSource.SKACoinSupply(ctx)
+	if err != nil {
+		log.Errorf("Store: SKACoinSupply failed: %v", err)
+	} else {
+		// Convert []*types.SKACoinSupplyEntry to []types.SKACoinSupplyEntry
+		entries := make([]types.SKACoinSupplyEntry, len(skaSupply))
+		for i, e := range skaSupply {
+			entries[i] = *e
+		}
+		p.HomeInfo.SKACoinSupply = entries
+	}
 
 	// If BlockData contains non-nil PoolInfo, copy values.
 	p.HomeInfo.PoolInfo = types.TicketPoolInfo{}
@@ -709,11 +721,6 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 	}(newBlockData.Height, blockData.CurrentStakeDiff.CurrentStakeDifficulty,
 		blockData.ExtraInfo.CoinSupply) // eval args now instead of in closure
 
-	// Project fund balance, not useful while syncing.
-	if exp.devPrefetch {
-		go exp.updateDevFundBalance()
-	}
-
 	// Trigger a vote info refresh.
 	if exp.voteTracker != nil {
 		go exp.voteTracker.Refresh()
@@ -770,20 +777,6 @@ func (exp *explorerUI) eTagAndLastModified() (eTag string, lastModified time.Tim
 	exp.pageData.RLock()
 	defer exp.pageData.RUnlock()
 	return exp.pageData.eTag, exp.pageData.lastModified
-}
-
-func (exp *explorerUI) updateDevFundBalance() {
-	// yield processor to other goroutines
-	runtime.Gosched()
-
-	devBalance, err := exp.dataSource.DevBalance(context.TODO())
-	if err == nil && devBalance != nil {
-		exp.pageData.Lock()
-		exp.pageData.HomeInfo.DevFund = devBalance.TotalUnspent
-		exp.pageData.Unlock()
-	} else {
-		log.Errorf("explorerUI.updateDevFundBalance failed: %v", err)
-	}
 }
 
 type loggerFunc func(string, ...interface{})

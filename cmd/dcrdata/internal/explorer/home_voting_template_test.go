@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/monetarium/monetarium-explorer/db/dbtypes"
 	"github.com/monetarium/monetarium-explorer/explorer/types"
 	"github.com/monetarium/monetarium-node/chaincfg"
 	"golang.org/x/net/html"
@@ -62,9 +61,8 @@ func renderVotingCard(t tHelper, tmpl templates, info *types.HomeInfo) string {
 // makeHomeInfo builds a HomeInfo with the given VoteVARReward and SKAVoteRewards.
 func makeHomeInfo(varReward types.VoteVARReward, skaRewards []types.SKAVoteReward) *types.HomeInfo {
 	return &types.HomeInfo{
-		TreasuryBalance: &dbtypes.TreasuryBalance{},
-		VoteVARReward:   varReward,
-		SKAVoteRewards:  skaRewards,
+		VoteVARReward:  varReward,
+		SKAVoteRewards: skaRewards,
 	}
 }
 

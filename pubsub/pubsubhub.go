@@ -111,16 +111,9 @@ func NewPubSubHub(dataSource DataSource) (*PubSubHub, error) {
 	sv := Version()
 	psh.ver = pstypes.NewVer(sv.Split())
 
-	// Development subsidy address of the current network
-	devSubsidyAddress, err := dbtypes.DevSubsidyAddress(params)
-	if err != nil {
-		log.Warnf("NewPubSubHub: bad project fund address: %v", err)
-	}
-
 	psh.state = &State{
 		// Set the constant parameters of GeneralInfo.
 		GeneralInfo: &exptypes.HomeInfo{
-			DevAddress: devSubsidyAddress,
 			Params: exptypes.ChainParams{
 				WindowSize:       params.StakeDiffWindowSize,
 				RewardWindowSize: params.SubsidyReductionInterval,

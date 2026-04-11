@@ -110,49 +110,31 @@
                         Supply
                     </div>
                     <div class="row mt-1">
+                        {{if .VARCoinSupply}}
                         <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
                             <div class="fs13 text-secondary">VAR Circulating Supply</div>
                             <div class="mono lh1rem fs14-decimal fs24 p03rem0 d-flex align-items-baseline">
-                                <span data-homepage-target="devFund">
-                                    {{template "decimalParts" (float64AsDecimalParts (toFloat64Amount (add .DevFund .TreasuryBalance.Balance)) 0 true)}}
+                                <span data-homepage-target="varCirculating">
+                                    {{formatCoinAtoms .VARCoinSupply.Circulating 0}}
                                 </span>
                                 <span class="ps-1 unit lh15rem">VAR</span>
                             </div>
-                            {{if $conv -}}
                             <div class="fs12 lh1rem text-black-50">
-                                <span data-homepage-target="convertedDev">{{threeSigFigs $conv.TreasuryBalance.Value}} {{$conv.TreasuryBalance.Index}}</span>
+                                Target: {{formatCoinAtoms .VARCoinSupply.Target 0}} VAR
                             </div>
-                            {{- end}}
                         </div>
+                        {{end}}
+                        {{if .SKACoinSupply}}
                         <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
-                            <div class="d-block fs13 text-secondary lh1rem"><a href="/charts?chart=coin-supply">Total Coin Supply</a> <span class="nowrap">(of 21 mil)</span></div>
-                            <div class="mono lh1rem fs14-decimal fs24 p03rem0 d-flex align-items-baseline">
-                                <span data-homepage-target="coinSupply">
-                                    {{template "decimalParts" (float64AsDecimalParts (toFloat64Amount .CoinSupply) 0 true)}}
-                                </span>
-                                <span class="ps-1 unit lh15rem">VAR</span>
+                            <div class="fs13 text-secondary">SKA Supply</div>
+                            {{range .SKACoinSupply}}
+                            <div class="fs12 lh1rem">
+                                <span class="text-secondary">SKA-{{.CoinType}}:</span>
+                                InCirc: {{formatCoinAtoms .InCirculation .CoinType}} | Issued: {{formatCoinAtoms .TotalIssued .CoinType}} | Burned: {{formatCoinAtoms .TotalBurned .CoinType}}
                             </div>
-                            <div class="fs12 lh1rem text-black-50">
-                                {{if $conv -}}
-                                <span data-homepage-target="convertedSupply">{{threeSigFigs $conv.CoinSupply.Value}} {{$conv.CoinSupply.Index}}</span>,
-                                {{- end}}
-                                <span data-homepage-target="mixedPct">{{printf "%.0f" .MixedPercent}}</span>% mixed
-                            </div>
+                            {{end}}
                         </div>
-                        <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
-                            <div class="fs13 text-secondary">Treasury Block Reward</div>
-                            <div class="mono lh1rem fs14-decimal fs24 p03rem0 d-flex align-items-baseline">
-                                <span data-homepage-target="bsubsidyDev">
-                                    {{template "decimalParts" (float64AsDecimalParts (toFloat64Amount .NBlockSubsidy.Dev) 8 true 2)}}
-                                </span>
-                                <span class="ps-1 unit lh15rem">VAR</span>
-                            </div>
-                            {{if $conv -}}
-                            <div class="fs12 lh1rem text-black-50">
-                                <span data-homepage-target="convertedDevSub">{{$conv.TreasurySplit.TwoDecimals}} {{$conv.TreasurySplit.Index}}</span>
-                            </div>
-                            {{- end}}
-                        </div>
+                        {{end}}
                         {{if $conv -}}
                         <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
                             <div class="fs13 text-secondary">

@@ -548,6 +548,7 @@ func makeTemplateFuncMap(params *chaincfg.Params) template.FuncMap {
 		"toFloat64Amount": func(intAmount int64) float64 {
 			return dcrutil.Amount(intAmount).ToCoin()
 		},
+		"formatCoinAtoms": formatCoinAtoms,
 		"skaDecimalParts": func(atomStr string, useCommas bool, boldNumPlaces ...int) []string {
 			return skaDecimalParts(atomStr, useCommas, boldNumPlaces...)
 		},

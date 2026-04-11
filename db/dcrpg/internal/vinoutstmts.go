@@ -241,6 +241,14 @@ const (
 			block_time, prev_tx_hash, prev_tx_index, prev_tx_tree, value_in, tx_type
 		FROM vouts WHERE id=$1;`
 
+	// SKACoinSupply sums the value of all unspent vouts by coin type.
+	// TotalIssued = sum of all vouts for that coin_type.
+	// InCirculation = TotalIssued - TotalBurned (placeholder: TotalBurned = 0).
+	SelectSKACoinSupply = `SELECT coin_type, sum(ska_value::numeric)
+		FROM vouts
+		WHERE coin_type > 0
+		GROUP BY coin_type;`
+
 	// TEST ONLY REMOVE
 	RetrieveVoutValue  = `SELECT value FROM vouts WHERE tx_hash=$1 and tx_index=$2;`
 	RetrieveVoutValues = `SELECT value, tx_index, tx_tree, coin_type FROM vouts WHERE tx_hash=$1;`

@@ -60,7 +60,6 @@ type CommonPageData struct {
 	Version       string
 	ChainParams   *chaincfg.Params
 	BlockTimeUnix int64
-	DevAddress    string
 	Links         *links
 	NetName       string
 	Cookies       Cookies
@@ -192,12 +191,10 @@ func (exp *explorerUI) Home(w http.ResponseWriter, r *http.Request) {
 	xcBot := exp.xcBot
 	if xcBot != nil {
 		conversions = &homeConversions{
-			ExchangeRate:    xcBot.Conversion(1.0),
-			StakeDiff:       xcBot.Conversion(homeInfo.StakeDiff),
-			CoinSupply:      xcBot.Conversion(dcrutil.Amount(homeInfo.CoinSupply).ToCoin()),
-			PowSplit:        xcBot.Conversion(dcrutil.Amount(homeInfo.NBlockSubsidy.PoW).ToCoin()),
-			TreasurySplit:   xcBot.Conversion(dcrutil.Amount(homeInfo.NBlockSubsidy.Dev).ToCoin()),
-			TreasuryBalance: xcBot.Conversion(dcrutil.Amount(homeInfo.DevFund + homeInfo.TreasuryBalance.Balance).ToCoin()),
+			ExchangeRate: xcBot.Conversion(1.0),
+			StakeDiff:    xcBot.Conversion(homeInfo.StakeDiff),
+			CoinSupply:   xcBot.Conversion(dcrutil.Amount(homeInfo.CoinSupply).ToCoin()),
+			PowSplit:     xcBot.Conversion(dcrutil.Amount(homeInfo.NBlockSubsidy.PoW).ToCoin()),
 		}
 	}
 
@@ -1426,7 +1423,8 @@ type TreasuryInfo struct {
 
 // TreasuryPage is the page handler for the "/treasury" path
 func (exp *explorerUI) TreasuryPage(w http.ResponseWriter, r *http.Request) {
-	ctx := context.WithValue(r.Context(), ctxAddress, exp.pageData.HomeInfo.DevAddress)
+	// Note: Monetarium does not have a treasury, so using empty address
+	ctx := context.WithValue(r.Context(), ctxAddress, "")
 	r = r.WithContext(ctx)
 	if queryVals := r.URL.Query(); queryVals.Get("txntype") == "" {
 		queryVals.Set("txntype", "tspend")
@@ -1473,9 +1471,9 @@ func (exp *explorerUI) TreasuryPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exp.pageData.RLock()
-	treasuryBalance := exp.pageData.HomeInfo.TreasuryBalance
-	exp.pageData.RUnlock()
+	// TreasuryBalance is not available in Monetarium (no treasury)
+	// Return empty balance for template compatibility
+	treasuryBalance := &dbtypes.TreasuryBalance{}
 
 	typeCount := treasuryTypeCount(treasuryBalance, txType)
 
@@ -1720,9 +1718,8 @@ func (exp *explorerUI) TreasuryTable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exp.pageData.RLock()
-	bal := exp.pageData.HomeInfo.TreasuryBalance
-	exp.pageData.RUnlock()
+	// TreasuryBalance is not available in Monetarium (no treasury)
+	bal := &dbtypes.TreasuryBalance{}
 
 	linkTemplate := "/treasury" + "?start=%d&n=" + strconv.FormatInt(limitN, 10) + "&txntype=" + fmt.Sprintf("%v", txType)
 
@@ -2545,7 +2542,6 @@ func (exp *explorerUI) commonData(r *http.Request) *CommonPageData {
 		Version:       exp.Version,
 		ChainParams:   exp.ChainParams,
 		BlockTimeUnix: int64(exp.ChainParams.TargetTimePerBlock.Seconds()),
-		DevAddress:    exp.pageData.HomeInfo.DevAddress,
 		NetName:       exp.NetName,
 		Links:         explorerLinks,
 		Cookies: Cookies{
