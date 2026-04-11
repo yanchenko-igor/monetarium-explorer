@@ -16,3 +16,32 @@ export function splitSkaValue(s) {
   const rest = trimmed.slice(2)
   return { intPart, bold, rest, trailingZeros }
 }
+
+/**
+ * splitSkaAtoms converts a raw SKA atom string (integer, 18 decimal places)
+ * into display parts, using BigInt to avoid float64 precision loss.
+ * Output shape matches splitSkaValue.
+ *
+ * @param {string} atomStr - e.g. "1583594312551510000"
+ * @param {number} [boldPlaces=2] - number of leading decimal digits to bold
+ * @returns {{ intPart: string, bold: string, rest: string, trailingZeros: string }}
+ */
+export function splitSkaAtoms(atomStr, boldPlaces = 2) {
+  if (!atomStr || atomStr === '0') return { intPart: '0', bold: '', rest: '', trailingZeros: '' }
+  let atoms
+  try {
+    atoms = BigInt(atomStr)
+  } catch {
+    return { intPart: atomStr, bold: '', rest: '', trailingZeros: '' }
+  }
+  const divisor = BigInt('1000000000000000000') // 10^18
+  const intPart = (atoms / divisor).toString()
+  const fracBig = atoms % divisor
+  // Zero-pad to 18 digits
+  const frac = fracBig.toString().padStart(18, '0')
+  const trimmed = frac.replace(/0+$/, '')
+  const trailingZeros = frac.slice(trimmed.length)
+  const bold = trimmed.slice(0, boldPlaces)
+  const rest = trimmed.slice(boldPlaces)
+  return { intPart, bold, rest, trailingZeros }
+}

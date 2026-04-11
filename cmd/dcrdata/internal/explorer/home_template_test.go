@@ -15,7 +15,7 @@ func newTestTemplates(t *testing.T) templates {
 	t.Helper()
 	funcMap := makeTemplateFuncMap(chaincfg.SimNetParams())
 	funcMap["asset"] = func(name string) string { return "/dist/" + name }
-	tmpl := newTemplates(viewsFolder, false, []string{"extras", "home_latest_blocks", "home_mempool", "home_voting"}, funcMap)
+	tmpl := newTemplates(viewsFolder, false, []string{"extras", "home_latest_blocks", "home_mempool", "home_voting", "home_mining"}, funcMap)
 	if err := tmpl.addTemplate("home"); err != nil {
 		t.Fatalf("addTemplate home: %v", err)
 	}
