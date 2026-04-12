@@ -85,9 +85,7 @@ export default class extends Controller {
       clone.querySelectorAll('[data-field]').forEach((el) => {
         const field = el.dataset.field
         if (field === 'unit') {
-          el.textContent = isDash
-            ? `— ${r.symbol}/VAR per last block`
-            : `${r.symbol}/VAR per last block`
+          el.textContent = isDash ? `— ${r.symbol}/Vote` : `${r.symbol}/Vote`
         } else if (field === 'per30d') {
           el.textContent = `${r.per_30_days} ${r.symbol}/VAR per 30 days`
         } else if (field === 'peryear') {
