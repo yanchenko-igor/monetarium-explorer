@@ -46,7 +46,11 @@ export default class extends Controller {
     const container = this.powSkaRewardsTarget
     container.innerHTML = ''
 
-    if (!Array.isArray(rewards) || rewards.length === 0) return
+    if (!Array.isArray(rewards) || rewards.length === 0) {
+      const emptyTmpl = document.getElementById('pow-ska-empty-template')
+      if (emptyTmpl) container.appendChild(document.importNode(emptyTmpl.content, true))
+      return
+    }
 
     rewards.forEach((r) => {
       const clone = document.importNode(tmpl.content, true)
