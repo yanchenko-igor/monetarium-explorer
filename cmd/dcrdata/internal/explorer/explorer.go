@@ -591,7 +591,7 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 	ticketRewardPct := 100 * posSubsPerVote / blockData.CurrentStakeDiff.CurrentStakeDifficulty
 	p.HomeInfo.TicketReward = ticketRewardPct
 	p.HomeInfo.VoteVARReward = types.VoteVARReward{
-		PerBlock:  posSubsPerVote / blockData.CurrentStakeDiff.CurrentStakeDifficulty,
+		PerBlock:  posSubsPerVote,
 		Per30Days: ticketRewardPct,
 		// PerYear (ASR) is computed asynchronously below; set placeholder here.
 		PerYear: p.HomeInfo.ASR,
@@ -610,8 +610,6 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 	// Compute per-SKA vote rewards. Averages are always computed from
 	// historical summaries so they survive SKA-free blocks. PerBlock is only
 	// populated when the current block contains SKA fee data.
-	sbits, _ := dcrutil.NewAmount(blockData.Header.SBits)
-	ticketPriceAtoms := int64(sbits)
 	voters := int64(blockData.Header.Voters)
 
 	blocksIn30Days := int(30 * 24 * time.Hour / exp.ChainParams.TargetTimePerBlock)
@@ -646,9 +644,9 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 		for ct := range coinTypes {
 			var perBlock string
 			if totalStr, ok := blockData.ExtraInfo.SSFeeTotalsByCoin[ct]; ok {
-				if total, parsed := new(big.Int).SetString(totalStr, 10); parsed && voters > 0 && ticketPriceAtoms > 0 {
+				if total, parsed := new(big.Int).SetString(totalStr, 10); parsed && voters > 0 {
 					perVote := new(big.Int).Div(total, big.NewInt(voters))
-					perBlock = txhelpers.FormatSKAPerVAR(perVote, ticketPriceAtoms)
+					perBlock = txhelpers.FormatSKAAtoms(perVote)
 				}
 			}
 			rewards = append(rewards, types.SKAVoteReward{
