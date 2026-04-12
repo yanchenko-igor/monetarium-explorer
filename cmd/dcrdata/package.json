@@ -5,8 +5,13 @@
   "main": "index.js",
   "private": true,
   "sideEffects": false,
+  "engines": {
+    "node": ">=20.20"
+  },
   "scripts": {
-    "build": "npm run format:check && npm run lint && npm run lint:css && webpack --config webpack.prod.cjs --progress --color",
+    "build": "webpack --config webpack.prod.cjs --progress --color",
+    "check": "npm run format:check && npm run lint && npm run lint:css",
+    "precommit": "npm run check",
     "test": "vitest run",
     "watch": "webpack --watch --config webpack.dev.cjs",
     "analyze": "webpack --config webpack.analyze.cjs",
@@ -64,7 +69,7 @@
     "webpack": "^5.76.3",
     "webpack-bundle-analyzer": "^4.8.0",
     "webpack-cli": "^5.0.1",
-    "webpack-manifest-plugin": "^6.0.1",
+    "webpack-manifest-plugin": "4.1.1",
     "webpack-merge": "^5.8.0"
   },
   "dependencies": {
