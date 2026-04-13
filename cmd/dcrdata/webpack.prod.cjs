@@ -1,7 +1,7 @@
 const { merge } = require('webpack-merge')
-const common = require('./webpack.common.cjs')
 const CssMinimizerPlugin = require('css-minimizer-webpack-plugin')
 const ESLintPlugin = require('eslint-webpack-plugin')
+const common = require('./webpack.common.cjs')
 
 module.exports = merge(common, {
   mode: 'production',
@@ -12,32 +12,33 @@ module.exports = merge(common, {
       threads: true
     })
   ],
-
   optimization: {
     usedExports: true,
     minimize: true,
     minimizer: [
-      `...`, // extend webpack 5's TerserPlugin
-      new CssMinimizerPlugin({})
+      '...', // extend webpack 5's default TerserPlugin
+      new CssMinimizerPlugin()
     ]
   },
-
   module: {
     rules: [
       {
         test: /\.js$/,
         exclude: [
           /node_modules/,
-          /\.test\.js$/ // 👈 exclude test files
+          /\.test\.js$/ // test files are not part of the production bundle
         ],
         use: {
           loader: 'babel-loader',
           options: {
             presets: [
-              '@babel/preset-env',
-              {
-                exclude: ['@babel/plugin-transform-regenerator']
-              }
+              // Tuple form is required: [preset, options]
+              [
+                '@babel/preset-env',
+                {
+                  exclude: ['@babel/plugin-transform-regenerator']
+                }
+              ]
             ]
           }
         }

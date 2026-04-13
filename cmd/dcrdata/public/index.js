@@ -6,12 +6,15 @@ import globalEventBus from './js/services/event_bus_service'
 import ws from './js/services/messagesocket_service'
 import { darkEnabled } from './js/services/theme_service'
 
-require('./scss/application.scss')
+import './scss/application.scss'
 
 window.darkEnabled = darkEnabled
 
 const application = Application.start()
-const context = require.context('./js/controllers', true, /(?<!\.test)\.js$/)
+const context = import.meta.webpackContext('./js/controllers', {
+  recursive: true,
+  regExp: /(?<!\.test)\.js$/
+})
 application.load(definitionsFromContext(context))
 
 document.addEventListener('turbolinks:load', (_e) => {

@@ -35,8 +35,7 @@ export default [
         navigator: 'readonly',
         Notification: 'readonly',
         localStorage: 'readonly',
-        sessionStorage: 'readonly',
-        require: 'readonly'
+        sessionStorage: 'readonly'
       }
     },
 
@@ -76,6 +75,21 @@ export default [
       'promise/no-return-wrap': 'error',
       'promise/param-names': 'error',
       'promise/catch-or-return': ['warn', { allowFinally: true }]
+    }
+  },
+
+  // CommonJS config files (webpack, etc.) — restore Node globals
+  {
+    files: ['**/*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: {
+        module: 'writable',
+        exports: 'writable',
+        require: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly'
+      }
     }
   },
 

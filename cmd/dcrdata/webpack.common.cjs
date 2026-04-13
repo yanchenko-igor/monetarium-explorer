@@ -1,21 +1,22 @@
-const path = require('path');
-const { CleanWebpackPlugin } = require('clean-webpack-plugin');
-const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-const StyleLintPlugin = require('stylelint-webpack-plugin');
-const { WebpackManifestPlugin } = require('webpack-manifest-plugin');
+const path = require('path')
+const { CleanWebpackPlugin } = require('clean-webpack-plugin')
+const MiniCssExtractPlugin = require('mini-css-extract-plugin')
+const StyleLintPlugin = require('stylelint-webpack-plugin')
+const { WebpackManifestPlugin } = require('webpack-manifest-plugin')
 
 module.exports = {
   entry: {
-    app: './public/index.js',
+    app: './public/index.js'
   },
+  // Turbolinks is vendored and loaded via a <script> tag, not bundled.
   externals: {
-    turbolinks: 'Turbolinks',
+    turbolinks: 'Turbolinks'
   },
   optimization: {
     chunkIds: 'natural',
     splitChunks: {
-      chunks: 'all',
-    },
+      chunks: 'all'
+    }
   },
   target: 'web',
   module: {
@@ -28,45 +29,44 @@ module.exports = {
             loader: 'css-loader',
             options: {
               modules: false,
+              // Fonts and images live in public/ and are served statically,
+              // so we skip webpack asset processing for url() references.
               url: false,
-              sourceMap: true,
-            },
+              sourceMap: true
+            }
           },
           {
             loader: 'sass-loader',
             options: {
               implementation: require('sass'), // dart-sass
-              sourceMap: true,
-            },
-          },
-        ],
-      },
-    ],
+              sourceMap: true
+            }
+          }
+        ]
+      }
+    ]
   },
   plugins: [
     new CleanWebpackPlugin(),
     new MiniCssExtractPlugin({
-      // Options similar to the same options in webpackOptions.output
-      // both options are optional
-      // filename: '[name].css',
-      // chunkFilename: '[id].css'
-      filename: 'css/style.[contenthash].css',
+      filename: 'css/style.[contenthash].css'
     }),
     new StyleLintPlugin({
       threads: true,
-      allowEmptyInput: true, // avoid errors with .stylelintignore
+      allowEmptyInput: true // avoid errors when .stylelintignore excludes all files
     }),
-    new WebpackManifestPlugin(/* options */),
+    new WebpackManifestPlugin()
   ],
   output: {
+    // xxhash64 is faster than the default md4 and supported on Node >= 18.
     hashFunction: 'xxhash64',
     filename: 'js/[name].[contenthash].bundle.js',
     path: path.resolve(__dirname, 'public/dist'),
-    publicPath: '/dist/',
+    publicPath: '/dist/'
   },
-  // Fixes weird issue with watch script. See
-  // https://github.com/webpack/webpack/issues/2297#issuecomment-289291324
+  // Use a 1 s poll interval instead of the default 500 ms to reduce CPU usage
+  // during watch mode. See https://github.com/webpack/webpack/issues/2297
   watchOptions: {
-    poll: true,
-  },
-};
+    poll: 1000
+  }
+}
