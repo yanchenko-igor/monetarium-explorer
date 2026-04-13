@@ -1,7 +1,6 @@
 name: Docker Build and Push
 on: [push, pull_request]
 
-
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
