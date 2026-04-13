@@ -5,10 +5,11 @@
 *.bak
 .idea/
 /dcrdata
+__debug_bin*
 debug
 *.cert
 *.key
-cmd/dcrdata/dcrdata
+cmd/dcrdata/monetarium-explorer
 dcrdata.conf
 /vendor/
 *.orig

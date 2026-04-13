@@ -2,6 +2,8 @@ package explorer
 
 import (
 	"testing"
+
+	"github.com/monetarium/monetarium-explorer/explorer/types"
 )
 
 func TestBlockVoteBitsStr(t *testing.T) {
@@ -270,4 +272,175 @@ func TestAmountAsDecimalPartsTrimmed(t *testing.T) {
 				expected[i].whole, expected[i].frac, expected[i].tail)
 		}
 	}
+}
+
+func TestCoinRowData_Variants(t *testing.T) {
+	// 0 SKA types: only VAR row
+	rows0 := []types.CoinRowData{
+		{CoinType: 0, Symbol: "VAR", TxCount: 5, Amount: "1.23K VAR", Size: 1024},
+	}
+	if len(rows0) != 1 || rows0[0].Symbol != "VAR" {
+		t.Errorf("0 SKA: unexpected rows: %v", rows0)
+	}
+
+	// 1 SKA type
+	rows1 := []types.CoinRowData{
+		{CoinType: 0, Symbol: "VAR", TxCount: 3, Amount: "500 VAR", Size: 512},
+		{CoinType: 1, Symbol: "SKA-1", TxCount: 2, Amount: "1M SKA-1", Size: 256},
+	}
+	if len(rows1) != 2 || rows1[1].CoinType != 1 {
+		t.Errorf("1 SKA: unexpected rows: %v", rows1)
+	}
+
+	// 2 SKA types
+	rows2 := []types.CoinRowData{
+		{CoinType: 0, Symbol: "VAR", TxCount: 1, Amount: "100 VAR", Size: 200},
+		{CoinType: 1, Symbol: "SKA-1", TxCount: 1, Amount: "50 SKA-1", Size: 100},
+		{CoinType: 2, Symbol: "SKA-2", TxCount: 1, Amount: "25 SKA-2", Size: 100},
+	}
+	if len(rows2) != 3 || rows2[2].Symbol != "SKA-2" {
+		t.Errorf("2 SKA: unexpected rows: %v", rows2)
+	}
+
+	// Verify TrimmedBlockInfo carries CoinRows
+	tbi := types.TrimmedBlockInfo{
+		Height:   100,
+		CoinRows: rows2,
+	}
+	if len(tbi.CoinRows) != 3 {
+		t.Errorf("TrimmedBlockInfo.CoinRows: want 3, got %d", len(tbi.CoinRows))
+	}
+}
+
+func TestCoinFillData(t *testing.T) {
+	fills := []types.CoinFillData{
+		{Symbol: "VAR", GQFillRatio: 0.5, GQPositionRatio: 0.10, Status: "ok"},
+		{Symbol: "SKA-1", GQFillRatio: 1.0, GQPositionRatio: 0.90, Status: "full"},
+	}
+	mpi := types.MempoolInfo{}
+	mpi.CoinFills = fills
+	if len(mpi.CoinFills) != 2 {
+		t.Errorf("MempoolInfo.CoinFills: want 2, got %d", len(mpi.CoinFills))
+	}
+	if mpi.CoinFills[0].Symbol != "VAR" || mpi.CoinFills[1].Status != "full" {
+		t.Errorf("unexpected CoinFills: %v", mpi.CoinFills)
+	}
+}
+
+func TestComputeCoinFills(t *testing.T) {
+	const max = 100.0 // simplified maxBlockSize for easy math
+
+	t.Run("empty stats", func(t *testing.T) {
+		fills, totalFill, numSKA := computeCoinFills(nil, max)
+		if len(fills) != 1 || fills[0].Symbol != "VAR" || fills[0].Status != "ok" {
+			t.Errorf("unexpected fills for empty stats: %v", fills)
+		}
+		if totalFill != 0.0 {
+			t.Errorf("empty stats: want totalFillRatio 0.0, got %f", totalFill)
+		}
+		if numSKA != 0 {
+			t.Errorf("empty stats: want numSKA 0, got %d", numSKA)
+		}
+	})
+
+	t.Run("VAR within quota", func(t *testing.T) {
+		stats := map[uint8]types.MempoolCoinStats{0: {Size: 5}} // 5 of 10 quota
+		fills, _, _ := computeCoinFills(stats, max)
+		if fills[0].Status != "ok" {
+			t.Errorf("VAR within quota: want ok, got %s", fills[0].Status)
+		}
+		if fills[0].GQPositionRatio != 0.10 {
+			t.Errorf("VAR GQPositionRatio: want 0.10, got %f", fills[0].GQPositionRatio)
+		}
+		if fills[0].GQFillRatio != 0.5 {
+			t.Errorf("VAR GQFillRatio: want 0.5, got %f", fills[0].GQFillRatio)
+		}
+	})
+
+	t.Run("VAR over quota, block not full", func(t *testing.T) {
+		stats := map[uint8]types.MempoolCoinStats{0: {Size: 15}} // 15 > 10 quota, < 100 total
+		fills, _, _ := computeCoinFills(stats, max)
+		if fills[0].Status != "borrowing" {
+			t.Errorf("VAR borrowing: want borrowing, got %s", fills[0].Status)
+		}
+		if fills[0].ExtraFillRatio == 0 {
+			t.Errorf("VAR borrowing: ExtraFillRatio should be non-zero")
+		}
+	})
+
+	t.Run("VAR over quota, block full", func(t *testing.T) {
+		stats := map[uint8]types.MempoolCoinStats{0: {Size: 110}} // > 100 total
+		fills, totalFill, _ := computeCoinFills(stats, max)
+		if fills[0].Status != "full" {
+			t.Errorf("VAR full: want full, got %s", fills[0].Status)
+		}
+		if fills[0].OverflowFillRatio == 0 {
+			t.Errorf("VAR full: OverflowFillRatio should be non-zero")
+		}
+		if totalFill <= 1.0 {
+			t.Errorf("VAR full: totalFillRatio should exceed 1.0, got %f", totalFill)
+		}
+	})
+
+	t.Run("SKA within quota", func(t *testing.T) {
+		// 1 SKA type gets 90% = 90 quota
+		stats := map[uint8]types.MempoolCoinStats{1: {Size: 40}}
+		fills, _, numSKA := computeCoinFills(stats, max)
+		if numSKA != 1 {
+			t.Errorf("SKA count: want 1, got %d", numSKA)
+		}
+		var ska types.CoinFillData
+		for _, f := range fills {
+			if f.Symbol == "SKA-1" {
+				ska = f
+			}
+		}
+		if ska.Status != "ok" {
+			t.Errorf("SKA within quota: want ok, got %s", ska.Status)
+		}
+		if ska.GQPositionRatio != 0.90 {
+			t.Errorf("SKA GQPositionRatio (1 SKA): want 0.90, got %f", ska.GQPositionRatio)
+		}
+	})
+
+	t.Run("SKA over own quota, pool not exhausted", func(t *testing.T) {
+		// 2 SKA types, each gets 45 quota; SKA-1 uses 50 but total SKA = 50 < 90
+		stats := map[uint8]types.MempoolCoinStats{1: {Size: 50}, 2: {Size: 0}}
+		fills, _, numSKA := computeCoinFills(stats, max)
+		if numSKA != 2 {
+			t.Errorf("SKA count: want 2, got %d", numSKA)
+		}
+		var ska1 types.CoinFillData
+		for _, f := range fills {
+			if f.Symbol == "SKA-1" {
+				ska1 = f
+			}
+		}
+		if ska1.Status != "borrowing" {
+			t.Errorf("SKA borrowing: want borrowing, got %s", ska1.Status)
+		}
+		wantPos := 0.90 / 2.0
+		if ska1.GQPositionRatio != wantPos {
+			t.Errorf("SKA GQPositionRatio (2 SKAs): want %f, got %f", wantPos, ska1.GQPositionRatio)
+		}
+	})
+
+	t.Run("SKA does not affect VAR status", func(t *testing.T) {
+		stats := map[uint8]types.MempoolCoinStats{0: {Size: 5}, 1: {Size: 95}}
+		fills, _, _ := computeCoinFills(stats, max)
+		for _, f := range fills {
+			if f.Symbol == "VAR" && f.Status != "ok" {
+				t.Errorf("VAR should be ok regardless of SKA: got %s", f.Status)
+			}
+		}
+	})
+
+	t.Run("SKA types sorted by ascending coin-type key", func(t *testing.T) {
+		stats := map[uint8]types.MempoolCoinStats{3: {Size: 1}, 1: {Size: 1}, 2: {Size: 1}}
+		fills, _, _ := computeCoinFills(stats, max)
+		// fills[0] is VAR; fills[1..3] should be SKA-1, SKA-2, SKA-3
+		if fills[1].Symbol != "SKA-1" || fills[2].Symbol != "SKA-2" || fills[3].Symbol != "SKA-3" {
+			t.Errorf("SKA order: want SKA-1,SKA-2,SKA-3 got %s,%s,%s", fills[1].Symbol, fills[2].Symbol, fills[3].Symbol)
+		}
+	})
 }

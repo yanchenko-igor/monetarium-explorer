@@ -1,0 +1,60 @@
+{{define "supply-card"}}
+{{- $conv := .Conversions -}}
+{{with .Info -}}
+<div class="bg-white mb-1 p-2 px-3 mx-1 flex-grow-1">
+    <div class="my-3 h4">
+        <span class="dcricon-tree d-inline-block pe-2 h4"></span>
+        Supply
+    </div>
+    <div class="row mt-1">
+        {{if .VARCoinSupply}}
+        <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
+            <div class="fs13 text-secondary">VAR Coin Supply</div>
+            <div class="mono lh1rem fs14-decimal fs24 p03rem0 d-flex align-items-baseline">
+                <span data-supply-target="varCirculating">
+                    {{formatCoinAtoms .VARCoinSupply.Circulating 0}}
+                </span>
+                <span class="ps-1 unit lh15rem">VAR</span>
+            </div>
+            <div class="fs12 lh1rem text-black-50">
+                (of ~47M) target: {{formatCoinAtoms .VARCoinSupply.Target 0}} VAR
+            </div>
+        </div>
+        {{end}}
+        {{if .SKACoinSupply}}
+        <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
+            <div class="fs13 text-secondary">SKA Coin Supply</div>
+            {{range .SKACoinSupply}}
+            <div class="mt-2">
+                <div class="fs12 text-secondary fw-semibold">SKA-{{.CoinType}}</div>
+                <div class="fs12 lh1rem d-flex justify-content-between">
+                    <span class="text-black-50">In Circulation</span>
+                    <span class="mono">{{formatCoinAtoms .InCirculation .CoinType}}</span>
+                </div>
+                <div class="fs12 lh1rem d-flex justify-content-between">
+                    <span class="text-black-50">Total Issued</span>
+                    <span class="mono">{{formatCoinAtoms .TotalIssued .CoinType}}</span>
+                </div>
+                <div class="fs12 lh1rem d-flex justify-content-between">
+                    <span class="text-black-50">Total Burned</span>
+                    <span class="mono">{{formatCoinAtoms .TotalBurned .CoinType}}</span>
+                </div>
+            </div>
+            {{end}}
+        </div>
+        {{end}}
+        {{if $conv -}}
+        <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
+            <div class="fs13 text-secondary">
+                <a class="no-underline" href="/market">Exchange Rate</a>
+            </div>
+            <div class="mono lh1rem fs14-decimal fs24 p03rem0 d-flex align-items-baseline">
+                <span class="d-inline-block" data-supply-target="exchangeRate">{{$conv.ExchangeRate.TwoDecimals}}</span>
+                <span class="ps-1 unit lh15rem">{{$conv.ExchangeRate.Index}}</span>
+            </div>
+        </div>
+        {{- end}}
+    </div>
+</div>
+{{- end}}
+{{end}}

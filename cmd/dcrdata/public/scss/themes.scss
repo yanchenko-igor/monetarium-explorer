@@ -1,8 +1,19 @@
+@use "sass:color";
+
+/* mempool status tokens — light mode (default) */
+:root {
+  --status-success: #{color.mix($blue, $mempool-ok, 10%)};
+  --status-warning: #{color.mix($blue, $mempool-borrowing, 10%)};
+  --status-danger: #{color.mix($blue, $mempool-full, 10%)};
+  --status-danger-hatched: #{color.mix($blue, $mempool-full, 10%)};
+  --indicator-track-bg: #ddd;
+}
+
 /**  testnet theme  **/
 body.theme-testnet {
   .top-nav,
   .navbar-fixed-bottom {
-    background: #116466;
+    background: $testnet-nav-bg;
     color: #fff;
   }
 
@@ -165,7 +176,7 @@ body.darkBG {
   }
 
   select,
-  input[type=number] {
+  input[type="number"] {
     color: #fff;
     background: #2a2a2a;
     border-color: #191919;
@@ -211,4 +222,22 @@ body.darkBG {
   .block-banner .text-secondary:hover {
     color: #fff !important;
   }
+
+  .link-button:hover,
+  .link-button:active {
+    color: $dark-link-hover-color;
+  }
+
+  .ska-sub-row--visible td:first-child {
+    box-shadow:
+      inset 3px 0 0 0 #4a5568,
+      inset 0 0 0 9999px var(--bs-table-accent-bg);
+  }
+
+  // Mempool status tokens — dark mode (reduced saturation and tinted)
+  --status-success: #{color.mix($blue, color.mix($mempool-ok, #000, 80%), 10%)};
+  --status-warning: #{color.mix($blue, color.mix($mempool-borrowing, #000, 80%), 10%)};
+  --status-danger: #{color.mix($blue, color.mix($mempool-full, #000, 80%), 10%)};
+  --status-danger-hatched: #{color.mix($blue, color.mix($mempool-full, #000, 80%), 10%)};
+  --indicator-track-bg: #757575;
 }

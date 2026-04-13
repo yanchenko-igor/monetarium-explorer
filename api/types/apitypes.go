@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	chainjson "github.com/decred/dcrd/rpc/jsonrpc/types/v4"
-	"github.com/decred/dcrd/txscript/v4/stdscript"
-	"github.com/decred/dcrdata/v8/db/dbtypes"
-	"github.com/decred/dcrdata/v8/txhelpers"
+	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	"github.com/monetarium/monetarium-explorer/txhelpers"
+	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
+	"github.com/monetarium/monetarium-node/txscript/stdscript"
 )
 
 // TimeAPI is a fall back dbtypes.TimeDef wrapper that allows API endpoints that
@@ -200,6 +200,8 @@ type Vout struct {
 	Version             uint16       `json:"version"`
 	ScriptPubKeyDecoded ScriptPubKey `json:"scriptPubKey"`
 	Spend               *TxInputID   `json:"spend,omitempty"` // unused?
+	CoinType            uint8        `json:"coin_type,omitempty"`
+	SKAValue            string       `json:"ska_value,omitempty"`
 }
 
 // TxInputID specifies a transaction input as hash:vin_index.
@@ -360,6 +362,8 @@ type TxOut struct {
 	Value               float64      `json:"value"`
 	Version             uint16       `json:"version"`
 	ScriptPubKeyDecoded ScriptPubKey `json:"scriptPubKey"`
+	CoinType            uint8        `json:"coin_type,omitempty"`
+	SKAValue            string       `json:"ska_value,omitempty"`
 }
 
 // TxIn defines a decred transaction input.
@@ -551,19 +555,19 @@ type APIStatus struct {
 	Height          uint32 `json:"node_height"`
 	NodeConnections int64  `json:"node_connections"`
 	APIVersion      int    `json:"api_version"`
-	DcrdataVersion  string `json:"dcrdata_version"`
+	ExplorerVersion string `json:"explorer_version"`
 	NetworkName     string `json:"network_name"`
 }
 
 // NewStatus is the constructor for a new Status.
-func NewStatus(nodeHeight uint32, conns int64, apiVersion int, dcrdataVersion, netName string) *Status {
+func NewStatus(nodeHeight uint32, conns int64, apiVersion int, explorerVersion, netName string) *Status {
 	return &Status{
 		height:          nodeHeight,
 		nodeConnections: conns,
 		api: APIStatus{
-			APIVersion:     apiVersion,
-			DcrdataVersion: dcrdataVersion,
-			NetworkName:    netName,
+			APIVersion:      apiVersion,
+			ExplorerVersion: explorerVersion,
+			NetworkName:     netName,
 		},
 	}
 }
@@ -579,7 +583,7 @@ func (s *Status) API() APIStatus {
 		Height:          s.height,
 		NodeConnections: s.nodeConnections,
 		APIVersion:      s.api.APIVersion,
-		DcrdataVersion:  s.api.DcrdataVersion,
+		ExplorerVersion: s.api.ExplorerVersion,
 		NetworkName:     s.api.NetworkName,
 	}
 }
@@ -706,6 +710,9 @@ type TicketPoolValsAndSizes struct {
 	Size        []uint32  `json:"size"`
 }
 
+// CoinTxStats is an alias for dbtypes.CoinTxStats — per-coin tx count and size.
+type CoinTxStats = dbtypes.CoinTxStats
+
 // BlockDataBasic models primary information about a block.
 type BlockDataBasic struct {
 	Height     uint32  `json:"height"`
@@ -717,6 +724,12 @@ type BlockDataBasic struct {
 	NumTx      uint32  `json:"txlength"`
 	MiningFee  *int64  `json:"fees,omitempty"`
 	TotalSent  *int64  `json:"total_sent,omitempty"`
+	// CoinAmounts holds per-coin totals (VAR key=0, SKA-n key=n) as decimal atom strings.
+	CoinAmounts map[uint8]string `json:"coin_amounts,omitempty"`
+	// CoinTxStats holds per-coin tx count and size (key 0=VAR, 1-255=SKA-n).
+	CoinTxStats map[uint8]CoinTxStats `json:"coin_tx_stats,omitempty"`
+	// SSFeeTotalsByCoin holds total SKA atoms distributed via TxTypeSSFee per coin type.
+	SSFeeTotalsByCoin map[uint8]string `json:"ssfee_totals,omitempty"`
 	// TicketPoolInfo may be nil for side chain blocks.
 	PoolInfo *TicketPoolInfo `json:"ticket_pool,omitempty"`
 }
@@ -747,6 +760,14 @@ type BlockExplorerExtraInfo struct {
 	TxLen            int                              `json:"tx"`
 	CoinSupply       int64                            `json:"coin_supply"`
 	NextBlockSubsidy *chainjson.GetBlockSubsidyResult `json:"next_block_subsidy"`
+	// CoinAmounts holds per-coin totals (VAR key=0, SKA-n key=n) as decimal atom strings.
+	CoinAmounts map[uint8]string `json:"coin_amounts,omitempty"`
+	// CoinTxStats holds per-coin tx count and size (key 0=VAR, 1-255=SKA-n).
+	CoinTxStats map[uint8]CoinTxStats `json:"coin_tx_stats,omitempty"`
+	// SSFeeTotalsByCoin holds total SKA atoms distributed via TxTypeSSFee per coin type.
+	SSFeeTotalsByCoin map[uint8]string `json:"ssfee_totals,omitempty"`
+	// SKAPoWRewards holds per-SKA-type PoW mining reward amounts (atom strings) from the block's coinbase.
+	SKAPoWRewards map[uint8]string `json:"ska_pow_rewards,omitempty"`
 }
 
 // BlockTransactionCounts contains the regular and stake transaction counts for

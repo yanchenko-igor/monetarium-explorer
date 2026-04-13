@@ -9,24 +9,27 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/dcrutil/v4"
-	chainjson "github.com/decred/dcrd/rpc/jsonrpc/types/v4"
-	"github.com/decred/dcrd/txscript/v4/stdscript"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/dcrutil"
+	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
+	"github.com/monetarium/monetarium-node/txscript/stdscript"
+	"github.com/monetarium/monetarium-node/wire"
 
-	"github.com/decred/dcrdata/v8/blockdata"
-	"github.com/decred/dcrdata/v8/db/dbtypes"
-	exptypes "github.com/decred/dcrdata/v8/explorer/types"
-	"github.com/decred/dcrdata/v8/mempool"
-	pstypes "github.com/decred/dcrdata/v8/pubsub/types"
-	"github.com/decred/dcrdata/v8/semver"
-	"github.com/decred/dcrdata/v8/txhelpers"
+	apitypes "github.com/monetarium/monetarium-explorer/api/types"
+	"github.com/monetarium/monetarium-explorer/blockdata"
+	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	exptypes "github.com/monetarium/monetarium-explorer/explorer/types"
+	"github.com/monetarium/monetarium-explorer/mempool"
+	pstypes "github.com/monetarium/monetarium-explorer/pubsub/types"
+	"github.com/monetarium/monetarium-explorer/semver"
+	"github.com/monetarium/monetarium-explorer/txhelpers"
 	"golang.org/x/net/websocket"
 )
 
@@ -50,6 +53,8 @@ type DataSource interface {
 	GetChainParams() *chaincfg.Params
 	BlockSubsidy(ctx context.Context, height int64, voters uint16) *chainjson.GetBlockSubsidyResult
 	Difficulty(ctx context.Context, timestamp int64) float64
+	Height() int64
+	GetSummaryRange(ctx context.Context, idx0, idx1 int) []*apitypes.BlockDataBasic
 }
 
 // State represents the current state of block chain.
@@ -106,16 +111,9 @@ func NewPubSubHub(dataSource DataSource) (*PubSubHub, error) {
 	sv := Version()
 	psh.ver = pstypes.NewVer(sv.Split())
 
-	// Development subsidy address of the current network
-	devSubsidyAddress, err := dbtypes.DevSubsidyAddress(params)
-	if err != nil {
-		return nil, fmt.Errorf("bad project fund address: %v", err)
-	}
-
 	psh.state = &State{
 		// Set the constant parameters of GeneralInfo.
 		GeneralInfo: &exptypes.HomeInfo{
-			DevAddress: devSubsidyAddress,
 			Params: exptypes.ChainParams{
 				WindowSize:       params.StakeDiffWindowSize,
 				RewardWindowSize: params.SubsidyReductionInterval,
@@ -498,19 +496,37 @@ loop:
 				clientData.newTxs.Unlock()
 				continue loop // break sigselect
 			}
-			err := enc.Encode(clientData.newTxs.t)
-
+			txSlice := clientData.newTxs.t
 			// Reinit the tx buffer.
 			clientData.newTxs.t = make(pstypes.TxList, 0, NewTxBufferSize)
 			clientData.newTxs.Unlock()
+
+			// Attach current fill data so the client can update indicators
+			// immediately without waiting for the next mempool event.
+			inv := psh.MempoolInventory()
+			inv.RLock()
+			newTxsPayload := struct {
+				Txs            pstypes.TxList          `json:"txs"`
+				CoinFills      []exptypes.CoinFillData `json:"coin_fills"`
+				TotalFillRatio float64                 `json:"total_fill_ratio"`
+				ActiveSKACount int                     `json:"active_ska_count"`
+			}{
+				Txs:            txSlice,
+				CoinFills:      inv.MempoolShort.CoinFills,
+				TotalFillRatio: inv.MempoolShort.TotalFillRatio,
+				ActiveSKACount: inv.MempoolShort.ActiveSKACount,
+			}
+			inv.RUnlock()
+
+			err := enc.Encode(newTxsPayload)
 			if err != nil {
-				log.Warnf("Encode([]*exptypes.MempoolTx) failed: %v", err)
+				log.Warnf("Encode(newTxsPayload) failed: %v", err)
 			}
 
 			pushMsg.Message = buff.Bytes()
 
 		case sigByeNow:
-			pushMsg.Message = []byte(`"The dcrdata server is shutting down. Bye!"`)
+			pushMsg.Message = []byte(`"The monetarium-explorer server is shutting down. Bye!"`)
 			log.Tracef("Sending %v", string(pushMsg.Message))
 
 		// case sigSyncStatus:
@@ -681,8 +697,13 @@ func (psh *PubSubHub) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgBl
 
 	posSubsPerVote := dcrutil.Amount(blockData.ExtraInfo.NextBlockSubsidy.PoS).ToCoin() /
 		float64(psh.params.TicketsPerBlock)
-	p.GeneralInfo.TicketReward = 100 * posSubsPerVote /
-		blockData.CurrentStakeDiff.CurrentStakeDifficulty
+	ticketRewardPct := 100 * posSubsPerVote / blockData.CurrentStakeDiff.CurrentStakeDifficulty
+	p.GeneralInfo.TicketReward = ticketRewardPct
+	p.GeneralInfo.VoteVARReward = exptypes.VoteVARReward{
+		PerBlock:  posSubsPerVote,
+		Per30Days: ticketRewardPct,
+		PerYear:   p.GeneralInfo.ASR, // ASR not recomputed in pubsub path; use last known value
+	}
 
 	// The actual reward of a ticket needs to also take into consideration the
 	// ticket maturity (time from ticket purchase until its eligible to vote)
@@ -694,6 +715,76 @@ func (psh *PubSubHub) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgBl
 	p.GeneralInfo.RewardPeriod = fmt.Sprintf("%.2f days", float64(avgSSTxToSSGenMaturity)*
 		psh.params.TargetTimePerBlock.Hours()/24)
 	//p.GeneralInfo.ASR = ASR
+
+	// Compute per-SKA vote rewards. Averages are always computed from
+	// historical summaries so they survive SKA-free blocks. PerBlock is only
+	// populated when the current block contains SKA fee data.
+	voters := int64(blockData.Header.Voters)
+
+	blocksIn30Days := int(30 * 24 * time.Hour / psh.params.TargetTimePerBlock)
+	tip := int(psh.sourceBase.Height())
+	start30 := tip - blocksIn30Days
+	if start30 < 0 {
+		start30 = 0
+	}
+	startYear := tip - blocksIn30Days*12
+	if startYear < 0 {
+		startYear = 0
+	}
+	toSummaries := func(blocks []*apitypes.BlockDataBasic) []txhelpers.SSFeeSummary {
+		s := make([]txhelpers.SSFeeSummary, len(blocks))
+		for i, b := range blocks {
+			s[i] = txhelpers.SSFeeSummary{SSFeeTotalsByCoin: b.SSFeeTotalsByCoin, StakeDiff: b.StakeDiff}
+		}
+		return s
+	}
+	sum30 := toSummaries(psh.sourceBase.GetSummaryRange(ctx, start30, tip))
+	sumYear := toSummaries(psh.sourceBase.GetSummaryRange(ctx, startYear, tip))
+
+	coinTypes := txhelpers.SSFeeCoinTypes(sumYear)
+	for ct := range blockData.ExtraInfo.SSFeeTotalsByCoin {
+		coinTypes[ct] = struct{}{}
+	}
+
+	if len(coinTypes) > 0 {
+		rewards := make([]exptypes.SKAVoteReward, 0, len(coinTypes))
+		for ct := range coinTypes {
+			var perBlock string
+			if totalStr, ok := blockData.ExtraInfo.SSFeeTotalsByCoin[ct]; ok {
+				if total, parsed := new(big.Int).SetString(totalStr, 10); parsed && voters > 0 {
+					perVote := new(big.Int).Div(total, big.NewInt(voters))
+					perBlock = txhelpers.FormatSKAAtoms(perVote)
+				}
+			}
+			rewards = append(rewards, exptypes.SKAVoteReward{
+				CoinType:  ct,
+				Symbol:    fmt.Sprintf("SKA-%d", ct),
+				PerBlock:  perBlock,
+				Per30Days: txhelpers.AvgSSFeeRate(sum30, ct, psh.params.TicketsPerBlock),
+				PerYear:   txhelpers.AvgSSFeeRate(sumYear, ct, psh.params.TicketsPerBlock),
+			})
+		}
+		sort.Slice(rewards, func(i, j int) bool { return rewards[i].CoinType < rewards[j].CoinType })
+		p.GeneralInfo.SKAVoteRewards = rewards
+	} else {
+		p.GeneralInfo.SKAVoteRewards = nil
+	}
+
+	// PoW SKA rewards: per-SKA-type mining reward amounts from the coinbase.
+	if len(blockData.ExtraInfo.SKAPoWRewards) > 0 {
+		powRewards := make([]exptypes.PoWSKAReward, 0, len(blockData.ExtraInfo.SKAPoWRewards))
+		for ct, amountStr := range blockData.ExtraInfo.SKAPoWRewards {
+			powRewards = append(powRewards, exptypes.PoWSKAReward{
+				CoinType: ct,
+				Symbol:   fmt.Sprintf("SKA-%d", ct),
+				Amount:   amountStr,
+			})
+		}
+		sort.Slice(powRewards, func(i, j int) bool { return powRewards[i].CoinType < powRewards[j].CoinType })
+		p.GeneralInfo.PoWSKARewards = powRewards
+	} else {
+		p.GeneralInfo.PoWSKARewards = nil
+	}
 
 	p.mtx.Unlock()
 

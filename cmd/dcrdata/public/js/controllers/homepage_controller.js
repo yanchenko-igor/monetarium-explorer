@@ -1,21 +1,22 @@
+/* global requestAnimationFrame */
 import { Controller } from '@hotwired/stimulus'
-import { each } from 'lodash-es'
 import dompurify from 'dompurify'
-import humanize from '../helpers/humanize_helper'
-import ws from '../services/messagesocket_service'
-import { keyNav } from '../services/keyboard_navigation_service'
-import globalEventBus from '../services/event_bus_service'
+import { each } from 'lodash-es'
 import { fadeIn } from '../helpers/animation_helper'
+import humanize from '../helpers/humanize_helper'
 import Mempool from '../helpers/mempool_helper'
-import { copyIcon, alertArea } from './clipboard_controller'
+import globalEventBus from '../services/event_bus_service'
+import { keyNav } from '../services/keyboard_navigation_service'
+import ws from '../services/messagesocket_service'
+import { alertArea, copyIcon } from './clipboard_controller'
 
-function incrementValue (element) {
+function incrementValue(element) {
   if (element) {
     element.textContent = parseInt(element.textContent) + 1
   }
 }
 
-function mempoolTableRow (tx) {
+function mempoolTableRow(tx) {
   const tbody = document.createElement('tbody')
   const link = `/tx/${tx.hash}`
   tbody.innerHTML = `<tr>
@@ -34,33 +35,26 @@ function mempoolTableRow (tx) {
 }
 
 export default class extends Controller {
-  static get targets () {
-    return ['transactions', 'difficulty',
-      'bsubsidyTotal', 'bsubsidyPow', 'bsubsidyPos', 'bsubsidyDev',
-      'coinSupply', 'blocksdiff', 'devFund', 'windowIndex', 'posBar',
-      'rewardIdx', 'powBar', 'poolSize', 'poolValue', 'ticketReward',
-      'targetPct', 'poolSizePct', 'hashrate', 'hashrateDelta',
-      'nextExpectedSdiff', 'nextExpectedMin', 'nextExpectedMax', 'mempool',
-      'mpRegTotal', 'mpRegCount', 'mpTicketTotal', 'mpTicketCount', 'mpVoteTotal', 'mpVoteCount',
-      'mpRevTotal', 'mpRevCount', 'mpRegBar', 'mpVoteBar', 'mpTicketBar',
-      'mpRevBar', 'voteTally', 'blockVotes', 'blockHeight', 'blockSize',
-      'blockTotal', 'consensusMsg', 'powConverted', 'convertedDev',
-      'convertedSupply', 'convertedDevSub', 'exchangeRate', 'convertedStake',
-      'mixedPct'
-    ]
+  static get targets() {
+    return ['transactions', 'mempool', 'voteTally', 'indicatorList', 'totalBar', 'coinFillBars']
   }
 
-  connect () {
-    this.ticketsPerBlock = parseInt(this.mpVoteCountTarget.dataset.ticketsPerBlock)
+  connect() {
     const mempoolData = this.mempoolTarget.dataset
     ws.send('getmempooltxs', mempoolData.id)
     this.mempool = new Mempool(mempoolData, this.voteTallyTargets)
-    this.setBars(this.mempool.totals())
+    // rAF frame guard for indicator updates (Requirement 5.7)
+    this._rafPending = false
+    this._pendingPayload = null
     ws.registerEvtHandler('newtxs', (evt) => {
-      const txs = JSON.parse(evt)
+      const m = JSON.parse(evt)
+      const txs = Array.isArray(m) ? m : m.txs || []
       this.mempool.mergeTxs(txs)
       this.setMempoolFigures()
       this.renderLatestTransactions(txs, true)
+      if (!Array.isArray(m) && m.coin_fills) {
+        this.updateIndicators(m)
+      }
       keyNav(evt, false, true)
     })
     ws.registerEvtHandler('mempool', (evt) => {
@@ -68,6 +62,7 @@ export default class extends Controller {
       this.renderLatestTransactions(m.latest, false)
       this.mempool.replace(m)
       this.setMempoolFigures()
+      this.updateIndicators(m)
       keyNav(evt, false, true)
       ws.send('getmempooltxs', '')
     })
@@ -75,79 +70,84 @@ export default class extends Controller {
       const m = JSON.parse(evt)
       this.mempool.replace(m)
       this.setMempoolFigures()
+      this.updateCoinFillBars(m.coin_fills)
       this.renderLatestTransactions(m.latest, true)
+      this.updateIndicators(m)
       keyNav(evt, false, true)
     })
     this.processBlock = this._processBlock.bind(this)
     globalEventBus.on('BLOCK_RECEIVED', this.processBlock)
   }
 
-  disconnect () {
+  disconnect() {
     ws.deregisterEvtHandlers('newtxs')
     ws.deregisterEvtHandlers('mempool')
     ws.deregisterEvtHandlers('getmempooltxsResp')
     globalEventBus.off('BLOCK_RECEIVED', this.processBlock)
   }
 
-  setMempoolFigures () {
+  setMempoolFigures() {
     const totals = this.mempool.totals()
     const counts = this.mempool.counts()
-    this.mpRegTotalTarget.textContent = humanize.threeSigFigs(totals.regular)
-    this.mpRegCountTarget.textContent = counts.regular
 
-    this.mpTicketTotalTarget.textContent = humanize.threeSigFigs(totals.ticket)
-    this.mpTicketCountTarget.textContent = counts.ticket
+    if (this.hasMpRegTotalTarget) {
+      this.mpRegTotalTarget.textContent = humanize.threeSigFigs(totals.regular)
+    }
+    if (this.hasMpRegCountTarget) {
+      this.mpRegCountTarget.textContent = counts.regular
+    }
+    if (this.hasMpTicketTotalTarget) {
+      this.mpTicketTotalTarget.textContent = humanize.threeSigFigs(totals.ticket)
+    }
+    if (this.hasMpTicketCountTarget) {
+      this.mpTicketCountTarget.textContent = counts.ticket
+    }
+    if (this.hasMpVoteTotalTarget) {
+      this.mpVoteTotalTarget.textContent = humanize.threeSigFigs(totals.vote)
+    }
 
-    this.mpVoteTotalTarget.textContent = humanize.threeSigFigs(totals.vote)
+    if (this.hasMpVoteCountTarget) {
+      const ct = this.mpVoteCountTarget
+      while (ct.firstChild) ct.removeChild(ct.firstChild)
+      this.mempool.voteSpans(counts.vote).forEach((span) => {
+        ct.appendChild(span)
+      })
+    }
 
-    const ct = this.mpVoteCountTarget
-    while (ct.firstChild) ct.removeChild(ct.firstChild)
-    this.mempool.voteSpans(counts.vote).forEach((span) => { ct.appendChild(span) })
+    if (this.hasMpRevTotalTarget) {
+      this.mpRevTotalTarget.textContent = humanize.threeSigFigs(totals.rev)
+    }
+    if (this.hasMpRevCountTarget) {
+      this.mpRevCountTarget.textContent = counts.rev
+    }
 
-    this.mpRevTotalTarget.textContent = humanize.threeSigFigs(totals.rev)
-    this.mpRevCountTarget.textContent = counts.rev
-
-    this.mempoolTarget.textContent = humanize.threeSigFigs(totals.total)
-    this.setBars(totals)
-    this.setVotes()
-  }
-
-  setBars (totals) {
-    this.mpRegBarTarget.style.width = `${totals.regular / totals.total * 100}%`
-    this.mpVoteBarTarget.style.width = `${totals.vote / totals.total * 100}%`
-    this.mpTicketBarTarget.style.width = `${totals.ticket / totals.total * 100}%`
-    this.mpRevBarTarget.style.width = `${totals.rev / totals.total * 100}%`
-  }
-
-  setVotes () {
-    const hash = this.blockVotesTarget.dataset.hash
-    const votes = this.mempool.blockVoteTally(hash)
-    this.blockVotesTarget.querySelectorAll('div').forEach((div, i) => {
-      const span = div.firstElementChild
-      if (i < votes.affirm) {
-        span.className = 'd-inline-block dcricon-affirm'
-        div.dataset.tooltip = 'the stakeholder has voted to accept this block'
-      } else if (i < votes.affirm + votes.reject) {
-        span.className = 'd-inline-block dcricon-reject'
-        div.dataset.tooltip = 'the stakeholder has voted to reject this block'
-      } else {
-        span.className = 'd-inline-block dcricon-missing'
-        div.dataset.tooltip = 'this vote has not been received yet'
-      }
-    })
-    const threshold = this.ticketsPerBlock / 2
-    if (votes.affirm > threshold) {
-      this.consensusMsgTarget.textContent = 'approved'
-      this.consensusMsgTarget.className = 'small text-green'
-    } else if (votes.reject > threshold) {
-      this.consensusMsgTarget.textContent = 'rejected'
-      this.consensusMsgTarget.className = 'small text-danger'
-    } else {
-      this.consensusMsgTarget.textContent = ''
+    if (
+      this.hasMpRegBarTarget &&
+      this.hasMpVoteBarTarget &&
+      this.hasMpTicketBarTarget &&
+      this.hasMpRevBarTarget
+    ) {
+      this.mpRegBarTarget.style.width = `${(totals.regular / totals.total) * 100}%`
+      this.mpVoteBarTarget.style.width = `${(totals.vote / totals.total) * 100}%`
+      this.mpTicketBarTarget.style.width = `${(totals.ticket / totals.total) * 100}%`
+      this.mpRevBarTarget.style.width = `${(totals.rev / totals.total) * 100}%`
     }
   }
 
-  renderLatestTransactions (txs, incremental) {
+  updateCoinFillBars(coinFills) {
+    if (!this.hasCoinFillBarsTarget || !coinFills || !coinFills.length) return
+    this.coinFillBarsTarget.innerHTML = coinFills
+      .map(
+        (f) =>
+          `<div style="flex:1;background:#eee;height:8px;border-radius:3px;overflow:hidden" title="${f.symbol}">
+        <div style="width:${(f.fill_pct * 100).toFixed(1)}%;height:100%" class="fill-${f.status}"></div>
+      </div>`
+      )
+      .join('')
+  }
+
+  renderLatestTransactions(txs, incremental) {
+    if (!this.hasTransactionsTarget) return
     each(txs, (tx) => {
       if (incremental) {
         const targetKey = `num${tx.Type}Target`
@@ -165,60 +165,175 @@ export default class extends Controller {
     })
   }
 
-  _processBlock (blockData) {
-    const ex = blockData.extra
-    this.difficultyTarget.innerHTML = humanize.threeSigFigs(ex.difficulty)
-    this.bsubsidyPowTarget.innerHTML = humanize.decimalParts(ex.subsidy.pow / 100000000, false, 8, 2)
-    this.bsubsidyPosTarget.innerHTML = humanize.decimalParts((ex.subsidy.pos / 500000000), false, 8, 2) // 5 votes per block (usually)
-    this.bsubsidyDevTarget.innerHTML = humanize.decimalParts(ex.subsidy.dev / 100000000, false, 8, 2)
-    this.coinSupplyTarget.innerHTML = humanize.decimalParts(ex.coin_supply / 100000000, true, 0)
-    this.mixedPctTarget.innerHTML = ex.mixed_percent.toFixed(0)
-    this.blocksdiffTarget.innerHTML = humanize.decimalParts(ex.sdiff, false, 8, 2)
-    this.nextExpectedSdiffTarget.innerHTML = humanize.decimalParts(ex.next_expected_sdiff, false, 2, 2)
-    this.nextExpectedMinTarget.innerHTML = humanize.decimalParts(ex.next_expected_min, false, 2, 2)
-    this.nextExpectedMaxTarget.innerHTML = humanize.decimalParts(ex.next_expected_max, false, 2, 2)
-    this.windowIndexTarget.textContent = ex.window_idx
-    this.posBarTarget.style.width = `${(ex.window_idx / ex.params.window_size) * 100}%`
-    this.poolSizeTarget.innerHTML = humanize.decimalParts(ex.pool_info.size, true, 0)
-    this.targetPctTarget.textContent = parseFloat(ex.pool_info.percent_target - 100).toFixed(2)
-    this.rewardIdxTarget.textContent = ex.reward_idx
-    this.powBarTarget.style.width = `${(ex.reward_idx / ex.params.reward_window_size) * 100}%`
-    this.poolValueTarget.innerHTML = humanize.decimalParts(ex.pool_info.value, true, 0)
-    this.ticketRewardTarget.innerHTML = `${ex.reward.toFixed(2)}%`
-    this.poolSizePctTarget.textContent = parseFloat(ex.pool_info.percent).toFixed(2)
-    const treasuryTotal = ex.dev_fund + ex.treasury_bal.balance
-    this.devFundTarget.innerHTML = humanize.decimalParts(treasuryTotal / 100000000, true, 0)
-    this.hashrateTarget.innerHTML = humanize.decimalParts(ex.hash_rate, false, 8, 2)
-    this.hashrateDeltaTarget.innerHTML = humanize.fmtPercentage(ex.hash_rate_change_month)
-    this.blockVotesTarget.dataset.hash = blockData.block.hash
-    this.setVotes()
-    const block = blockData.block
-    this.blockHeightTarget.textContent = block.height
-    this.blockHeightTarget.href = `/block/${block.hash}`
-    this.blockSizeTarget.textContent = humanize.bytes(block.size)
-    this.blockTotalTarget.textContent = humanize.threeSigFigs(block.total)
+  _processBlock(blockData) {
+    this.dispatch('block', { detail: blockData })
+  }
 
-    if (ex.exchange_rate) {
-      const xcRate = ex.exchange_rate.value
-      const index = ex.exchange_rate.index
-      if (this.hasPowConvertedTarget) {
-        this.powConvertedTarget.textContent = `${humanize.twoDecimals(ex.subsidy.pow / 1e8 * xcRate)} ${index}`
-      }
-      if (this.hasConvertedDevTarget) {
-        this.convertedDevTarget.textContent = `${humanize.threeSigFigs(treasuryTotal / 1e8 * xcRate)} ${index}`
-      }
-      if (this.hasConvertedSupplyTarget) {
-        this.convertedSupplyTarget.textContent = `${humanize.threeSigFigs(ex.coin_supply / 1e8 * xcRate)} ${index}`
-      }
-      if (this.hasConvertedDevSubTarget) {
-        this.convertedDevSubTarget.textContent = `${humanize.twoDecimals(ex.subsidy.dev / 1e8 * xcRate)} ${index}`
-      }
-      if (this.hasExchangeRateTarget) {
-        this.exchangeRateTarget.textContent = humanize.twoDecimals(xcRate)
-      }
-      if (this.hasConvertedStakeTarget) {
-        this.convertedStakeTarget.textContent = `${humanize.twoDecimals(ex.sdiff * xcRate)} ${index}`
+  // ─── Indicator update methods ───────────────────────────────────────────────
+
+  // updateIndicators schedules a single rAF flush for the given payload.
+  // If a frame is already pending, the payload is overwritten (Requirement 5.7).
+  updateIndicators(payload) {
+    if (this._rafPending) {
+      this._pendingPayload = payload
+      return
+    }
+    this._pendingPayload = payload
+    this._rafPending = true
+    requestAnimationFrame(() => {
+      this._flushIndicators()
+    })
+  }
+
+  // _flushIndicators performs all DOM writes in a single animation frame
+  // (Requirements 5.6, 7.1, 7.3).
+  _flushIndicators() {
+    const payload = this._pendingPayload
+    this._rafPending = false
+
+    if (!payload) return
+
+    const coinFills = payload.coin_fills
+    const totalFillRatio = payload.total_fill_ratio
+    const activeSKACount = payload.active_ska_count
+
+    // Update Fill_Bars
+    if (Array.isArray(coinFills)) {
+      const activeSymbols = new Set(coinFills.map((e) => e && e.symbol).filter(Boolean))
+
+      coinFills.forEach((entry) => {
+        if (!entry || typeof entry.symbol !== 'string') return
+        const el = this.hasIndicatorListTarget
+          ? this.indicatorListTarget.querySelector(`[data-coin="${entry.symbol}"]`)
+          : null
+        if (el) {
+          this._applyFillBar(el, entry)
+        } else {
+          this._injectFillBar(entry)
+        }
+      })
+
+      // Remove bars for coins no longer in the payload (e.g. after a new block)
+      if (this.hasIndicatorListTarget) {
+        this.indicatorListTarget.querySelectorAll('[data-coin]').forEach((bar) => {
+          if (!activeSymbols.has(bar.dataset.coin)) {
+            bar.remove()
+          }
+        })
       }
     }
+
+    // Update Total_Bar
+    if (this.hasTotalBarTarget && typeof totalFillRatio === 'number' && isFinite(totalFillRatio)) {
+      const clamped = Math.min(totalFillRatio, 1.0)
+      const fill = this.totalBarTarget.querySelector('.total-bar__fill')
+      if (fill) fill.style.setProperty('--seg-w', `${(clamped * 100).toFixed(4)}%`)
+      this.totalBarTarget.setAttribute('aria-valuenow', Math.round(clamped * 100))
+      const pct = this.totalBarTarget.querySelector('.total-bar__pct')
+      if (pct) pct.textContent = `${(clamped * 100).toFixed(1)}%`
+      if (totalFillRatio > 1.0) {
+        this.totalBarTarget.setAttribute('data-overflow', 'true')
+      } else {
+        this.totalBarTarget.removeAttribute('data-overflow')
+      }
+    }
+
+    // Update SKA GQ_Marker positions when Active_SKA_Count changes (Requirement 5.3)
+    if (typeof activeSKACount === 'number' && activeSKACount > 0 && this.hasIndicatorListTarget) {
+      const newGQPos = 0.9 / activeSKACount
+      const newGQPosStr = newGQPos.toFixed(6)
+      this.indicatorListTarget.querySelectorAll('[data-coin]').forEach((bar) => {
+        const coin = bar.dataset.coin
+        if (!coin || coin === 'VAR') return
+        const track = bar.querySelector('.fill-bar__track')
+        if (track) track.style.setProperty('--gq-pos', newGQPosStr)
+        const marker = bar.querySelector('.gq-marker')
+        if (marker) marker.style.left = `${(newGQPos * 100).toFixed(4)}%`
+      })
+    }
   }
+
+  // _applyFillBar updates all visual and ARIA properties of an existing Fill_Bar
+  // (Requirements 5.2, 8.5).
+  _applyFillBar(el, entry) {
+    const track = el.querySelector('.fill-bar__track')
+    if (!track) return
+
+    const gqFill = typeof entry.gq_fill_ratio === 'number' ? entry.gq_fill_ratio : 0
+    const extraFill = typeof entry.extra_fill_ratio === 'number' ? entry.extra_fill_ratio : 0
+    const overflowFill =
+      typeof entry.overflow_fill_ratio === 'number' ? entry.overflow_fill_ratio : 0
+    const gqPos = typeof entry.gq_position_ratio === 'number' ? entry.gq_position_ratio : 0
+    const status = typeof entry.status === 'string' ? entry.status : ''
+
+    // Set transform: scaleX on each segment — no width changes, no layout reflow
+    const gqSeg = track.querySelector('.gq-segment')
+    const extraSeg = track.querySelector('.extra-segment')
+    const overflowSeg = track.querySelector('.overflow-segment')
+    const marker = track.querySelector('.gq-marker')
+
+    if (gqSeg) {
+      gqSeg.style.setProperty('--seg-w', `${(gqFill * gqPos * 100).toFixed(4)}%`)
+      gqSeg.hidden = gqFill === 0
+    }
+    if (extraSeg) {
+      extraSeg.style.setProperty('--seg-w', `${(extraFill * 100).toFixed(4)}%`)
+      extraSeg.hidden = extraFill === 0
+    }
+    if (overflowSeg) {
+      overflowSeg.style.setProperty('--seg-w', `${(overflowFill * 100).toFixed(4)}%`)
+      overflowSeg.hidden = overflowFill === 0
+    }
+    if (marker) marker.style.left = `${(gqPos * 100).toFixed(4)}%`
+
+    track.style.setProperty('--gq-pos', gqPos.toFixed(6))
+    track.dataset.status = ['ok', 'borrowing', 'full'].includes(status) ? status : ''
+
+    // ARIA (Requirements 8.2, 8.3, 8.5)
+    // Percentage expressed as fraction of TC (= gqFill × gqPos), matching Total_Bar scale
+    const pctOfTC = gqFill * gqPos * 100
+    el.setAttribute('aria-valuenow', Math.round(pctOfTC))
+    el.setAttribute('aria-label', `${entry.symbol} — ${status || 'unknown'}`)
+
+    // Percentage label
+    const pct = el.querySelector('.fill-bar__pct')
+    if (pct) pct.textContent = `${pctOfTC.toFixed(1)}%`
+  }
+
+  // _injectFillBar clones the fill-bar-template and inserts it in canonical order
+  // (Requirements 5.4, 6.1–6.5).
+  _injectFillBar(entry) {
+    if (!this.hasIndicatorListTarget) return
+    const tmpl = document.getElementById('fill-bar-template')
+    if (!tmpl) return
+
+    const clone = document.importNode(tmpl.content, true)
+    const bar = clone.querySelector('.fill-bar')
+    if (!bar) return
+
+    bar.dataset.coin = entry.symbol
+    const labelEl = bar.querySelector('.fill-bar__label')
+    if (labelEl) labelEl.textContent = entry.symbol
+
+    this._applyFillBar(bar, entry)
+
+    // Bisect insertion: VAR first, then SKA types by ascending numeric index
+    const list = this.indicatorListTarget
+    const existing = Array.from(list.querySelectorAll('[data-coin]'))
+    const insertBefore = existing.find(
+      (el) => _coinSortKey(el.dataset.coin) > _coinSortKey(entry.symbol)
+    )
+    if (insertBefore) {
+      list.insertBefore(bar, insertBefore)
+    } else {
+      list.appendChild(bar)
+    }
+  }
+}
+
+// _coinSortKey returns a numeric sort key: VAR = 0, SKA-n = n.
+function _coinSortKey(symbol) {
+  if (!symbol || symbol === 'VAR') return 0
+  const m = symbol.match(/^SKA-(\d+)$/)
+  return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER
 }

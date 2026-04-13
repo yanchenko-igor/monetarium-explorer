@@ -21,15 +21,16 @@ import (
 	"sync"
 
 	"github.com/decred/base58"
-	"github.com/decred/dcrd/blockchain/stake/v5"
-	"github.com/decred/dcrd/blockchain/standalone/v2"
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/dcrutil/v4"
-	chainjson "github.com/decred/dcrd/rpc/jsonrpc/types/v4"
-	"github.com/decred/dcrd/txscript/v4/stdaddr"
-	"github.com/decred/dcrd/txscript/v4/stdscript"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/monetarium-node/blockchain/stake"
+	"github.com/monetarium/monetarium-node/blockchain/standalone"
+	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
+	"github.com/monetarium/monetarium-node/cointype"
+	"github.com/monetarium/monetarium-node/dcrutil"
+	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
+	"github.com/monetarium/monetarium-node/txscript/stdaddr"
+	"github.com/monetarium/monetarium-node/txscript/stdscript"
+	"github.com/monetarium/monetarium-node/wire"
 )
 
 var (
@@ -37,7 +38,7 @@ var (
 	zeroHashStringBytes = []byte(chainhash.Hash{}.String())
 )
 
-var CoinbaseFlags = "/dcrd/"
+var CoinbaseFlags = "/monetarium-node/"
 var CoinbaseScript = append([]byte{0x00, 0x00}, []byte(CoinbaseFlags)...)
 
 const (
@@ -498,8 +499,10 @@ func TxPrevOutsByAddr(txAddrOuts MempoolAddressStore, txnsStore TxnsStore, msgTx
 		// prevOut.Index indicates which output.
 		txOut := prevTx.TxOut[prevOut.Index]
 
-		// Get the values.
-		valsIn[inIdx] = txOut.Value
+		// Get the values (VAR only; SKA inputs are tracked separately via SKAValueIn).
+		if txOut.CoinType == 0 { // cointype.CoinTypeVAR
+			valsIn[inIdx] = txOut.Value
+		}
 
 		// Extract the addresses from this output's PkScript.
 		_, txAddrs := stdscript.ExtractAddrs(txOut.Version, txOut.PkScript, params)
@@ -756,6 +759,7 @@ func OutPointAddresses(outPoint *wire.OutPoint, c RawTransactionGetter,
 	// For the TxOut of interest, extract the list of addresses
 	txOut := txOuts[outPoint.Index]
 	_, txAddrs := stdscript.ExtractAddrs(txOut.Version, txOut.PkScript, params)
+	// Return VAR amount; SKA outputs have Value=0 (use txOut.SKAValue for big.Int precision).
 	value := dcrutil.Amount(txOut.Value)
 	addresses := make([]string, 0, len(txAddrs))
 	for _, txAddr := range txAddrs {
@@ -1069,7 +1073,10 @@ func FeeRateInfoBlock(block *dcrutil.Block) *chainjson.FeeInfoBlock {
 			amtIn += msgTx.TxIn[iv].ValueIn
 		}
 		for iv := range msgTx.TxOut {
-			amtOut += msgTx.TxOut[iv].Value
+			// Stake tickets are VAR-only; guard anyway.
+			if msgTx.TxOut[iv].CoinType == 0 { // cointype.CoinTypeVAR
+				amtOut += msgTx.TxOut[iv].Value
+			}
 		}
 		fee := dcrutil.Amount(1000*(amtIn-amtOut)).ToCoin() / float64(msgTx.SerializeSize())
 		if fee < minFee {
@@ -1130,6 +1137,7 @@ const (
 	TxTypeTreasurybase  string = "Treasurybase"
 	TxTypeTreasurySpend string = "Treasury Spend"
 	TxTypeTreasuryAdd   string = "Treasury Add"
+	TxTypeSSFee         string = "Stake Fee"
 )
 
 // DetermineTxTypeString returns a string representing the transaction type
@@ -1166,6 +1174,8 @@ func TxTypeToString(txType int) string {
 		return TxTypeTreasurySpend
 	case stake.TxTypeTreasuryBase:
 		return TxTypeTreasurybase
+	case stake.TxTypeSSFee:
+		return TxTypeSSFee
 	default:
 		return TxTypeRegular
 	}
@@ -1260,13 +1270,42 @@ func FeeRate(amtIn, amtOut, sizeBytes int64) int64 {
 	return 1000 * (amtIn - amtOut) / sizeBytes
 }
 
-// TotalOutFromMsgTx computes the total value out of a MsgTx
+// TotalOutFromMsgTx computes the total VAR value out of a MsgTx.
+// SKA outputs are excluded (their amounts are in v.SKAValue, not v.Value).
 func TotalOutFromMsgTx(msgTx *wire.MsgTx) dcrutil.Amount {
 	var amtOut int64
 	for _, v := range msgTx.TxOut {
-		amtOut += v.Value
+		if v.CoinType == cointype.CoinTypeVAR {
+			amtOut += v.Value
+		}
 	}
 	return dcrutil.Amount(amtOut)
+}
+
+// SKATotalsFromMsgTx returns per-SKA-coin output totals as decimal atom strings
+// (key = SKA coin type number). Returns nil if the tx has no SKA outputs.
+func SKATotalsFromMsgTx(msgTx *wire.MsgTx) map[uint8]string {
+	var totals map[uint8]*big.Int
+	for _, v := range msgTx.TxOut {
+		if v.CoinType.IsSKA() && v.SKAValue != nil {
+			if totals == nil {
+				totals = make(map[uint8]*big.Int)
+			}
+			k := uint8(v.CoinType)
+			if totals[k] == nil {
+				totals[k] = new(big.Int)
+			}
+			totals[k].Add(totals[k], v.SKAValue)
+		}
+	}
+	if len(totals) == 0 {
+		return nil
+	}
+	out := make(map[uint8]string, len(totals))
+	for k, v := range totals {
+		out[k] = v.String()
+	}
+	return out
 }
 
 // TotalVout computes the total value of a slice of chainjson.Vout

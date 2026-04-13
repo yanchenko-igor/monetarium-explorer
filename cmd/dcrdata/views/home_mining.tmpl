@@ -1,0 +1,102 @@
+{{define "mining-card"}}
+{{- $page := . -}}
+{{- $conv := $page.Conversions -}}
+{{with $page.Info -}}
+<div class="bg-white mb-1 py-2 px-3 mx-1 my-0">
+    <div class="my-3 h4">
+        <span class="dcricon-pickaxe d-inline-block pe-2 h3"></span>
+        <span>Mining</span>
+    </div>
+    <div class="row mt-1">
+        <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
+            <div class="fs13 text-secondary">
+                <a class="no-underline" href="/charts?chart=pow-difficulty">Difficulty</a>
+            </div>
+            <div class="mono lh1rem p03rem0 fs14-decimal fs24 p03rem0 d-flex align-items-baseline">
+                <span data-mining-target="difficulty">{{threeSigFigs .Difficulty}}</span>
+            </div>
+        </div>
+        <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
+            <div class="fs13 text-secondary"><a href="/charts?chart=hashrate">Hashrate</a></div>
+            <div class="mono lh1rem pt-1 pb-1 fs14-decimal fs24 d-flex align-items-baseline">
+                <span data-mining-target="hashrate">{{template "decimalParts" (float64AsDecimalParts .HashRate 8 true 2)}}</span>
+                <span class="ps-1 unit lh15rem">Ph/s</span>
+            </div>
+            <div class="fs12 text-black-50 lh1rem text-black-50">
+                <span data-mining-target="hashrateDelta">{{template "fmtPercentage" .HashRateChangeMonth}}</span> in past 30 days
+            </div>
+        </div>
+        <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
+            <div class="fs13 text-secondary">PoW VAR Reward</div>
+            <div class="mono lh1rem p03rem0 fs14-decimal fs24 p03rem0 d-flex align-items-baseline">
+                <span data-mining-target="bsubsidyPow">{{template "decimalParts" (float64AsDecimalParts (toFloat64Amount .NBlockSubsidy.PoW) 8 true 2)}}</span>
+                <span class="ps-1 unit lh15rem">VAR</span>
+            </div>
+            {{if $conv -}}
+            <div class="fs12 lh1rem text-black-50">
+                <span data-mining-target="powConverted">{{$conv.PowSplit.TwoDecimals}} {{$conv.PowSplit.Index}}</span>
+            </div>
+            {{- end}}
+        </div>
+        {{if .PoWSKARewards}}
+        <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
+            <div class="fs13 text-secondary">PoW SKA Reward</div>
+            <div data-mining-target="powSkaRewards">
+            {{range .PoWSKARewards}}
+            <div class="mono lh1rem p03rem0 fs14-decimal fs24 p03rem0 d-flex align-items-baseline">
+                <span>{{template "decimalParts" (skaDecimalParts .Amount true 2)}}</span>
+                <span class="ps-1 unit lh15rem">{{.Symbol}} <span class="text-black-50 ms-1 fs12">per last block</span></span>
+            </div>
+            {{end}}
+            </div>
+        </div>
+        {{else}}
+        <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
+            <div class="fs13 text-secondary">PoW SKA Reward</div>
+            <div data-mining-target="powSkaRewards">
+                <div class="fs12 lh1rem text-black-50">No SKA rewards available</div>
+            </div>
+        </div>
+        {{end}}
+        {{/* Template for JS live-update cloning */}}
+        <template id="pow-ska-reward-template">
+            <div class="mono lh1rem p03rem0 fs14-decimal fs24 p03rem0 d-flex align-items-baseline">
+                <div class="decimal-parts d-inline-block">
+                    <span class="int"></span><span class="decimal"></span><span class="decimal trailing-zeroes"></span>
+                </div>
+                <span class="ps-1 unit lh15rem"><span class="symbol"></span> <span class="text-black-50 ms-1 fs12">per last block</span></span>
+            </div>
+        </template>
+        <template id="pow-ska-empty-template">
+            <div class="fs12 lh1rem text-black-50">No SKA rewards available</div>
+        </template>
+        <div class="col-12 mb-3 mb-sm-2 mb-md-3 mb-lg-3">
+            <div class="fs13 text-secondary lh1rem">Next Block VAR Reward Reduction</div>
+            <div class="progress mt-1 mb-1">
+                <div
+                    class="progress-bar rounded"
+                    data-mining-target="powBar"
+                    role="progressbar"
+                    style="width: {{rewardAdjustmentProgress .IdxInRewardWindow}}%;"
+                    aria-valuenow="{{.IdxInRewardWindow}}"
+                    aria-valuemin="0"
+                    aria-valuemax="{{.Params.RewardWindowSize}}"
+                >
+                    <span
+                        id="powreward"
+                        class="nowrap ps-1"
+                    >
+                        block <span data-mining-target="rewardIdx" >{{.IdxInRewardWindow}}</span> of {{.Params.RewardWindowSize}}
+                    </span>
+                </div>
+            </div>
+            <div class="fs12 lh1rem">
+                <span class="text-black-50">
+                    {{remaining .IdxInRewardWindow .Params.RewardWindowSize .Params.BlockTime}}
+                </span>
+            </div>
+        </div>
+    </div>
+</div> <!-- end mining card -->
+{{- end}}
+{{end}}

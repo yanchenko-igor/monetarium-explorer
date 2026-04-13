@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/decred/dcrd/dcrutil/v4"
-	chainjson "github.com/decred/dcrd/rpc/jsonrpc/types/v4"
+	"github.com/monetarium/monetarium-node/dcrutil"
+	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
 
-	apitypes "github.com/decred/dcrdata/v8/api/types"
-	"github.com/decred/dcrdata/v8/db/dbtypes"
-	exptypes "github.com/decred/dcrdata/v8/explorer/types"
+	apitypes "github.com/monetarium/monetarium-explorer/api/types"
+	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	exptypes "github.com/monetarium/monetarium-explorer/explorer/types"
 )
 
 // DataCache models the basic data for the mempool cache.
@@ -44,6 +44,11 @@ type DataCache struct {
 // pass a copy of the []types.MempoolTx so that it may be modified (e.g. sorted)
 // without affecting other MempoolDataSavers.
 func (c *DataCache) StoreMPData(stakeData *StakeData, txsCopy []exptypes.MempoolTx, _ *exptypes.MempoolInfo) {
+	// stakeData is nil when called from TxHandler (incremental update path).
+	// In that case we skip the cache update — explorerUI.StoreMPData handles it.
+	if stakeData == nil {
+		return
+	}
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 

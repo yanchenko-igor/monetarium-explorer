@@ -11,36 +11,37 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/decred/dcrd/blockchain/stake/v5"
-	"github.com/decred/dcrd/blockchain/standalone/v2"
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/decred/dcrd/dcrutil/v4"
-	chainjson "github.com/decred/dcrd/rpc/jsonrpc/types/v4"
-	"github.com/decred/dcrd/rpcclient/v8"
-	"github.com/decred/dcrd/txscript/v4"
-	"github.com/decred/dcrd/txscript/v4/stdaddr"
-	"github.com/decred/dcrd/txscript/v4/stdscript"
-	"github.com/decred/dcrd/wire"
 	humanize "github.com/dustin/go-humanize"
+	"github.com/monetarium/monetarium-node/blockchain/stake"
+	"github.com/monetarium/monetarium-node/blockchain/standalone"
+	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
+	"github.com/monetarium/monetarium-node/dcrec/secp256k1"
+	"github.com/monetarium/monetarium-node/dcrutil"
+	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
+	"github.com/monetarium/monetarium-node/rpcclient"
+	"github.com/monetarium/monetarium-node/txscript"
+	"github.com/monetarium/monetarium-node/txscript/stdaddr"
+	"github.com/monetarium/monetarium-node/txscript/stdscript"
+	"github.com/monetarium/monetarium-node/wire"
 
-	"github.com/decred/dcrdata/db/dcrpg/v8/internal"
-	apitypes "github.com/decred/dcrdata/v8/api/types"
-	"github.com/decred/dcrdata/v8/blockdata"
-	"github.com/decred/dcrdata/v8/db/cache"
-	"github.com/decred/dcrdata/v8/db/dbtypes"
-	exptypes "github.com/decred/dcrdata/v8/explorer/types"
-	"github.com/decred/dcrdata/v8/mempool"
-	"github.com/decred/dcrdata/v8/rpcutils"
-	"github.com/decred/dcrdata/v8/stakedb"
-	"github.com/decred/dcrdata/v8/trylock"
-	"github.com/decred/dcrdata/v8/txhelpers"
+	apitypes "github.com/monetarium/monetarium-explorer/api/types"
+	"github.com/monetarium/monetarium-explorer/blockdata"
+	"github.com/monetarium/monetarium-explorer/db/cache"
+	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	"github.com/monetarium/monetarium-explorer/db/dcrpg/internal"
+	exptypes "github.com/monetarium/monetarium-explorer/explorer/types"
+	"github.com/monetarium/monetarium-explorer/mempool"
+	"github.com/monetarium/monetarium-explorer/rpcutils"
+	"github.com/monetarium/monetarium-explorer/stakedb"
+	"github.com/monetarium/monetarium-explorer/trylock"
+	"github.com/monetarium/monetarium-explorer/txhelpers"
 )
 
 var (
@@ -1819,61 +1820,8 @@ func (pgb *ChainDB) TSpendVotes(ctx context.Context, tspendID *chainhash.Hash) (
 
 // TreasuryBalance calculates the *dbtypes.TreasuryBalance.
 func (pgb *ChainDB) TreasuryBalance(ctx context.Context) (*dbtypes.TreasuryBalance, error) {
-	var addCount, added, immatureCount, immature, spendCount, spent, baseCount, base int64
-
 	_, tipHeight := pgb.BestBlock()
-	maturityHeight := tipHeight - int64(pgb.chainParams.CoinbaseMaturity)
-
-	rows, err := pgb.db.QueryContext(ctx, internal.SelectTreasuryBalance, maturityHeight)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var txType, matureCount, allCount, matureValue, allValue sql.NullInt64
-		if err = rows.Scan(&txType, &matureCount, &allCount, &matureValue, &allValue); err != nil {
-			return nil, err
-		}
-
-		imCount := allCount.Int64 - matureCount.Int64
-		imValue := allValue.Int64 - matureValue.Int64
-
-		switch stake.TxType(txType.Int64) {
-		case stake.TxTypeTSpend:
-			spendCount = allCount.Int64
-			spent = -matureValue.Int64
-		case stake.TxTypeTAdd:
-			immatureCount += imCount
-			immature += imValue
-			addCount = allCount.Int64
-			added = matureValue.Int64
-		case stake.TxTypeTreasuryBase:
-			immatureCount += imCount
-			immature += imValue
-			baseCount = allCount.Int64
-			base = matureValue.Int64
-		}
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return &dbtypes.TreasuryBalance{
-		Height:         tipHeight,
-		MaturityHeight: maturityHeight,
-		Balance:        added + base - spent,
-		TxCount:        addCount + spendCount + baseCount,
-		AddCount:       addCount,
-		Added:          added,
-		SpendCount:     spendCount,
-		Spent:          spent,
-		TBaseCount:     baseCount,
-		TBase:          base,
-		ImmatureCount:  immatureCount,
-		Immature:       immature,
-	}, nil
+	return &dbtypes.TreasuryBalance{Height: tipHeight}, nil
 }
 
 // TreasuryTxns fetches filtered treasury transactions.
@@ -4896,6 +4844,127 @@ func (pgb *ChainDB) CurrentCoinSupply(ctx context.Context) (supply *apitypes.Coi
 	}
 }
 
+// GetBurnedCoins retrieves the total burned amount for all SKA coin types.
+func (pgb *ChainDB) GetBurnedCoins(ctx context.Context) (map[uint8]*big.Int, error) {
+	res, err := rpcutils.GetBurnedCoins(ctx, pgb.Client)
+	if err != nil {
+		return nil, err
+	}
+	result := res
+
+	burnedMap := make(map[uint8]*big.Int)
+	skaScale := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
+
+	for _, stat := range result.Stats {
+		// Convert coin string (e.g., "8000.16") to atoms (big.Int)
+		// Use big.Rat for guaranteed precision
+		br := new(big.Rat)
+		if _, ok := br.SetString(stat.TotalBurned); !ok {
+			log.Errorf("GetBurnedCoins: failed to parse burned amount %q", stat.TotalBurned)
+			burnedMap[stat.CoinType] = big.NewInt(0)
+			continue
+		}
+
+		// Multiply by 10^18 and convert to big.Int
+		scaleRat := new(big.Rat).SetInt(skaScale)
+		atomsRat := new(big.Rat).Mul(br, scaleRat)
+
+		if atomsRat.IsInt() {
+			burnedMap[stat.CoinType] = atomsRat.Num()
+		} else {
+			// Handle cases where RPC might return more than 18 decimals (unexpected)
+			burnedMap[stat.CoinType] = new(big.Int).Div(atomsRat.Num(), atomsRat.Denom())
+		}
+	}
+
+	return burnedMap, nil
+}
+
+// SKACoinSupply retrieves the supply info for all SKA coin types.
+// TotalIssued = sum of vouts by coin_type (mainchain).
+// TotalBurned = retrieved from RPC getburnedcoins.
+// InCirculation = TotalIssued - TotalBurned.
+func (pgb *ChainDB) SKACoinSupply(ctx context.Context) ([]*exptypes.SKACoinSupplyEntry, error) {
+	rows, err := pgb.db.QueryContext(ctx, internal.SelectSKACoinSupply)
+	if err != nil {
+		log.Errorf("SKACoinSupply query failed: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Fetch burned coins from RPC
+	burnedMap, err := pgb.GetBurnedCoins(ctx)
+	if err != nil {
+		log.Errorf("SKACoinSupply: GetBurnedCoins failed: %v", err)
+		return nil, err
+	}
+
+	var supply []*exptypes.SKACoinSupplyEntry
+	for rows.Next() {
+		var entry exptypes.SKACoinSupplyEntry
+		var valueStr string
+		if err := rows.Scan(&entry.CoinType, &valueStr); err != nil {
+			log.Errorf("SKACoinSupply scan failed: %v", err)
+			return nil, err
+		}
+
+		issuedAtoms := new(big.Int)
+		if _, ok := issuedAtoms.SetString(valueStr, 10); !ok {
+			log.Errorf("SKACoinSupply: failed to parse sum %q as big.Int", valueStr)
+		}
+
+		burnedAtoms := big.NewInt(0)
+		if b, ok := burnedMap[entry.CoinType]; ok {
+			burnedAtoms = b
+		}
+
+		circulatingAtoms := new(big.Int).Sub(issuedAtoms, burnedAtoms)
+
+		formatAtoms := func(bi *big.Int) string {
+			s := bi.String()
+			if len(s) < 18 {
+				s = strings.Repeat("0", 18-len(s)) + s
+			}
+			return s
+		}
+
+		entry.TotalIssued = formatAtoms(issuedAtoms)
+		entry.TotalBurned = formatAtoms(burnedAtoms)
+		entry.InCirculation = formatAtoms(circulatingAtoms)
+		supply = append(supply, &entry)
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Errorf("SKACoinSupply rows error: %v", err)
+		return nil, err
+	}
+
+	return supply, nil
+}
+
+// VARCoinSupply retrieves the VAR circulating supply and target cap.
+func (pgb *ChainDB) VARCoinSupply(ctx context.Context) (*exptypes.VARCoinSupply, error) {
+	coinSupply, err := pgb.Client.GetCoinSupply(ctx)
+	if err != nil {
+		log.Errorf("VARCoinSupply RPC failed: %v", err)
+		return nil, err
+	}
+
+	// Circulating: from RPC (int64 atoms, 8 decimals)
+	circulating := fmt.Sprintf("%08d", coinSupply)
+
+	// Target: from UltimateSubsidy (total VAR that will ever be emitted)
+	dcp0010Height := pgb.DCP0010ActivationHeight()
+	dcp0012Height := pgb.DCP0012ActivationHeight()
+	ultimate := txhelpers.UltimateSubsidy(pgb.chainParams, dcp0010Height, dcp0012Height)
+	target := fmt.Sprintf("%08d", ultimate)
+
+	return &exptypes.VARCoinSupply{
+		Circulating: circulating,
+		Target:      target,
+	}, nil
+}
+
 // GetBlockByHash gets a *wire.MsgBlock for the supplied hex-encoded hash
 // string.
 func (pgb *ChainDB) GetBlockByHash(ctx context.Context, hash string) (*wire.MsgBlock, error) {
@@ -4990,6 +5059,8 @@ func (pgb *ChainDB) GetAPITransaction(ctx context.Context, txid *chainhash.Hash)
 		tx.Vout[i].Value = vout.Value
 		tx.Vout[i].N = vout.N
 		tx.Vout[i].Version = vout.Version
+		tx.Vout[i].CoinType = vout.CoinType
+		tx.Vout[i].SKAValue = vout.SKAValue
 		spk := &tx.Vout[i].ScriptPubKeyDecoded
 		spkRaw := &vout.ScriptPubKey
 		spk.Asm = spkRaw.Asm
@@ -5134,8 +5205,10 @@ func (pgb *ChainDB) GetAllTxOut(ctx context.Context, txid *chainhash.Hash) []*ap
 			apiScriptClass = apitypes.ScriptClassStakeSubCommit
 		}
 		allTxOut = append(allTxOut, &apitypes.TxOut{
-			Value:   txouts[i].Value,
-			Version: txouts[i].Version,
+			Value:    txouts[i].Value,
+			Version:  txouts[i].Version,
+			CoinType: txouts[i].CoinType,
+			SKAValue: txouts[i].SKAValue,
 			ScriptPubKeyDecoded: apitypes.ScriptPubKey{
 				Asm:       spk.Asm,
 				Hex:       spk.Hex,
@@ -5974,6 +6047,14 @@ func (pgb *ChainDB) GetExplorerBlock(ctx context.Context, hash string) *exptypes
 		Subsidy:               pgb.BlockSubsidy(ctx, b.Height, b.Voters),
 	}
 
+	// Populate per-coin amounts from the block summary (computed at collection time).
+	if summary := pgb.GetSummaryByHash(ctx, hash, false); summary != nil && summary.CoinAmounts != nil {
+		block.CoinAmounts = summary.CoinAmounts
+		// Also populate CoinRows on the embedded BlockBasic so the websocket
+		// path (which sends BlockInfo) carries coin_rows for the frontend.
+		block.BlockBasic.CoinRows = coinRowsFromSummary(summary)
+	}
+
 	if data.PoWHash != "" {
 		block.PoWHash = data.PoWHash
 	} else if pgb.IsDCP0011Active(b.Height) {
@@ -5996,6 +6077,7 @@ func (pgb *ChainDB) GetExplorerBlock(ctx context.Context, hash string) *exptypes
 	votes := make([]*exptypes.TrimmedTxInfo, 0, block.Voters)
 	revocations := make([]*exptypes.TrimmedTxInfo, 0, block.Revocations)
 	tickets := make([]*exptypes.TrimmedTxInfo, 0, block.FreshStake)
+	var stakeFees []*exptypes.TrimmedTxInfo
 
 	var treasury []*exptypes.TrimmedTxInfo
 	// treasuryActive := txhelpers.IsTreasuryActive(pgb.chainParams.Net, b.Height)
@@ -6027,6 +6109,8 @@ func (pgb *ChainDB) GetExplorerBlock(ctx context.Context, hash string) *exptypes
 			revocations = append(revocations, stx)
 		case stake.TxTypeTAdd, stake.TxTypeTSpend, stake.TxTypeTreasuryBase:
 			treasury = append(treasury, stx)
+		case stake.TxTypeSSFee:
+			stakeFees = append(stakeFees, stx)
 		}
 	}
 
@@ -6056,6 +6140,7 @@ func (pgb *ChainDB) GetExplorerBlock(ctx context.Context, hash string) *exptypes
 	block.Votes = votes
 	block.Revs = revocations
 	block.Tickets = tickets
+	block.StakeFees = stakeFees
 	block.TotalMixed = totalMixed
 
 	sortTx := func(txs []*exptypes.TrimmedTxInfo) {
@@ -6069,6 +6154,7 @@ func (pgb *ChainDB) GetExplorerBlock(ctx context.Context, hash string) *exptypes
 	sortTx(block.Votes)
 	sortTx(block.Revs)
 	sortTx(block.Tickets)
+	sortTx(block.StakeFees)
 
 	getTotalFee := func(txs []*exptypes.TrimmedTxInfo) (total dcrutil.Amount) {
 		for _, tx := range txs {
@@ -6097,7 +6183,7 @@ func (pgb *ChainDB) GetExplorerBlock(ctx context.Context, hash string) *exptypes
 		return
 	}
 	block.TotalSent = (getTotalSent(block.Tx) + getTotalSent(block.Treasury) + getTotalSent(block.Revs) +
-		getTotalSent(block.Tickets) + getTotalSent(block.Votes)).ToCoin()
+		getTotalSent(block.Tickets) + getTotalSent(block.Votes) + getTotalSent(block.StakeFees)).ToCoin()
 	block.MiningFee = (getTotalFee(block.Tx) + getTotalFee(block.Treasury) + getTotalFee(block.Revs) +
 		getTotalFee(block.Tickets) + getTotalFee(block.Votes)).ToCoin()
 
@@ -6122,6 +6208,10 @@ func (pgb *ChainDB) GetExplorerBlocks(ctx context.Context, start int, end int) [
 		block := new(exptypes.BlockBasic)
 		if data != nil {
 			block = makeExplorerBlockBasic(data, pgb.chainParams)
+			// Populate per-coin rows from the stored block summary.
+			if summary := pgb.GetSummaryByHash(ctx, data.Hash, false); summary != nil {
+				block.CoinRows = coinRowsFromSummary(summary)
+			}
 		}
 		summaries = append(summaries, block)
 	}
@@ -6707,4 +6797,42 @@ func (pgb *ChainDB) SignalHeight(height uint32) {
 			pgb.shutdownDcrdata()
 		}
 	}
+}
+
+// coinRowsFromAmounts converts a CoinAmounts map to []CoinRowData for the
+// blocks table. Returns nil when amounts is nil or empty.
+func coinRowsFromAmounts(amounts map[uint8]string) []exptypes.CoinRowData {
+	if len(amounts) == 0 {
+		return nil
+	}
+	rows := make([]exptypes.CoinRowData, 0, len(amounts))
+	for ct, atomsStr := range amounts {
+		var symbol string
+		if ct == 0 {
+			symbol = "VAR"
+		} else {
+			symbol = fmt.Sprintf("SKA-%d", ct)
+		}
+		rows = append(rows, exptypes.CoinRowData{
+			CoinType: ct,
+			Symbol:   symbol,
+			Amount:   atomsStr, // raw atoms; template formats with threeSigFigs
+		})
+	}
+	// Sort: VAR first, then SKA by type number.
+	sort.Slice(rows, func(i, j int) bool { return rows[i].CoinType < rows[j].CoinType })
+	return rows
+}
+
+// coinRowsFromSummary builds []CoinRowData from a block summary, merging
+// CoinAmounts with CoinTxStats so each row carries amount, tx count, and size.
+func coinRowsFromSummary(summary *apitypes.BlockDataBasic) []exptypes.CoinRowData {
+	rows := coinRowsFromAmounts(summary.CoinAmounts)
+	for i := range rows {
+		if s, ok := summary.CoinTxStats[rows[i].CoinType]; ok {
+			rows[i].TxCount = s.TxCount
+			rows[i].Size = s.Size
+		}
+	}
+	return rows
 }

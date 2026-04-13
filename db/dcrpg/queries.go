@@ -8,23 +8,24 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"strings"
 	"time"
 
-	"github.com/decred/dcrd/blockchain/stake/v5"
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/monetarium-node/blockchain/stake"
+	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/wire"
 
-	"github.com/decred/dcrdata/db/dcrpg/v8/internal"
-	apitypes "github.com/decred/dcrdata/v8/api/types"
-	"github.com/decred/dcrdata/v8/db/cache"
-	"github.com/decred/dcrdata/v8/db/dbtypes"
-	"github.com/decred/dcrdata/v8/txhelpers"
 	humanize "github.com/dustin/go-humanize"
 	"github.com/lib/pq"
+	apitypes "github.com/monetarium/monetarium-explorer/api/types"
+	"github.com/monetarium/monetarium-explorer/db/cache"
+	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	"github.com/monetarium/monetarium-explorer/db/dcrpg/internal"
+	"github.com/monetarium/monetarium-explorer/txhelpers"
 )
 
 // dbBestBlock retrieves the best block hash and height from the meta table. The
@@ -1333,7 +1334,7 @@ func insertAddressRowsDbTx(dbTx *sql.Tx, dbAs []*dbtypes.AddressRow, dupCheck, u
 		var id uint64
 		err := stmt.QueryRow(dbA.Address, dbA.MatchingTxHash, dbA.TxHash,
 			dbA.TxVinVoutIndex, dbA.VinVoutDbID, dbA.Value, dbA.TxBlockTime,
-			dbA.IsFunding, dbA.ValidMainChain, dbA.TxType).Scan(&id)
+			dbA.IsFunding, dbA.ValidMainChain, dbA.TxType, dbA.CoinType, dbA.SKAValue).Scan(&id)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				log.Errorf("failed to insert/update an AddressRow: %v", *dbA)
@@ -1428,7 +1429,8 @@ func retrieveAddressBalance(ctx context.Context, db *sql.DB, address string) (ba
 	for rows.Next() {
 		var count, totalValue int64
 		var noMatchingTx, isFunding, isRegular bool
-		err = rows.Scan(&isRegular, &count, &totalValue, &isFunding, &noMatchingTx)
+		var coinType uint8
+		err = rows.Scan(&isRegular, &coinType, &count, &totalValue, &isFunding, &noMatchingTx)
 		if err != nil {
 			return
 		}
@@ -1771,7 +1773,7 @@ func scanAddressQueryRows(rows *sql.Rows, queryType int) (addressRows []*dbtypes
 
 		err = rows.Scan(&id, &addr.Address, &addr.MatchingTxHash, &addr.TxHash, &addr.TxType,
 			&addr.ValidMainChain, &txVinIndex, &addr.TxBlockTime, &vinDbID,
-			&addr.Value, &addr.IsFunding)
+			&addr.Value, &addr.IsFunding, &addr.CoinType, &addr.SKAValue)
 
 		if err != nil {
 			return
@@ -1928,7 +1930,8 @@ func insertVinsStmt(stmt *sql.Stmt, dbVins dbtypes.VinTxPropertyARRAY) ([]uint64
 		var id uint64
 		err := stmt.QueryRow(vin.TxID, vin.TxIndex, vin.TxTree,
 			vin.PrevTxHash, vin.PrevTxIndex, vin.PrevTxTree,
-			vin.ValueIn, vin.IsValid, vin.IsMainchain, vin.Time, vin.TxType).Scan(&id)
+			vin.ValueIn, vin.CoinType, sql.NullString{String: vin.SKAValue, Valid: vin.SKAValue != ""},
+			vin.IsValid, vin.IsMainchain, vin.Time, vin.TxType).Scan(&id)
 		if err != nil {
 			return ids, fmt.Errorf("InsertVins INSERT exec failed: %w", err)
 		}
@@ -2051,10 +2054,10 @@ func insertVoutsStmt(stmt *sql.Stmt, dbVouts []*dbtypes.Vout) ([]uint64, []dbtyp
 	for _, vout := range dbVouts {
 		var id uint64
 		err := stmt.QueryRow(
-			vout.TxHash, vout.TxIndex, vout.TxTree, vout.Value, int32(vout.Version),
+			vout.TxHash, vout.TxIndex, vout.TxTree, vout.Value, vout.CoinType,
 			// vout.ScriptPubKey, int32(vout.ScriptPubKeyData.ReqSigs),
-			vout.ScriptPubKeyData.Type,
-			addressList(vout.ScriptPubKeyData.Addresses), vout.Mixed).Scan(&id)
+			int32(vout.Version), vout.ScriptPubKeyData.Type,
+			addressList(vout.ScriptPubKeyData.Addresses), vout.Mixed, vout.SKAValue).Scan(&id)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				continue
@@ -2070,6 +2073,8 @@ func insertVoutsStmt(stmt *sql.Stmt, dbVouts []*dbtypes.Vout) ([]uint64, []dbtyp
 				VinVoutDbID:    id,
 				TxType:         vout.TxType,
 				Value:          vout.Value,
+				CoinType:       vout.CoinType,
+				SKAValue:       vout.SKAValue,
 				// Not set here are: ValidMainchain, MatchingTxHash, IsFunding,
 				// AtomsCredit, AtomsDebit, and TxBlockTime.
 			})
@@ -2360,13 +2365,15 @@ func retrieveVinsByIDs(ctx context.Context, db *sql.DB, vinDbIDs []uint64) ([]db
 	vins := make([]dbtypes.VinTxProperty, len(vinDbIDs))
 	for i, id := range vinDbIDs {
 		vin := &vins[i]
+		var skaVal sql.NullString
 		err := db.QueryRowContext(ctx, internal.SelectAllVinInfoByID, id).Scan(&vin.TxID,
 			&vin.TxIndex, &vin.TxTree, &vin.IsValid, &vin.IsMainchain,
 			&vin.Time, &vin.PrevTxHash, &vin.PrevTxIndex, &vin.PrevTxTree,
-			&vin.ValueIn, &vin.TxType)
+			&vin.ValueIn, &vin.CoinType, &skaVal, &vin.TxType)
 		if err != nil {
 			return nil, err
 		}
+		vin.SKAValue = skaVal.String
 	}
 	return vins, nil
 }
@@ -2439,7 +2446,8 @@ func retrieveUTXOsStmt(ctx context.Context, db *sql.DB, stmt string) ([]dbtypes.
 	for rows.Next() {
 		var addresses string
 		var utxo dbtypes.UTXO
-		err = rows.Scan(&utxo.VoutDbID, &utxo.TxHash, &utxo.TxIndex, &addresses, &utxo.Value, &utxo.Mixed)
+		err = rows.Scan(&utxo.VoutDbID, &utxo.TxHash, &utxo.TxIndex, &addresses, &utxo.Value, &utxo.Mixed,
+			&utxo.UTXOData.CoinType, &utxo.UTXOData.SKAValue)
 		if err != nil {
 			return nil, err
 		}
@@ -2659,7 +2667,7 @@ func retrieveTxOutData(tx SqlQueryer, txid dbtypes.ChainHash, idx uint32, tree i
 	var data dbtypes.UTXOData
 	var addrArray string
 	err := tx.QueryRow(internal.SelectVoutAddressesByTxOut, txid, idx, tree).
-		Scan(&data.VoutDbID, &addrArray, &data.Value, &data.Mixed)
+		Scan(&data.VoutDbID, &addrArray, &data.Value, &data.Mixed, &data.CoinType, &data.SKAValue)
 	if err != nil {
 		return nil, fmt.Errorf("SelectVoutAddressesByTxOut: %w", err)
 	}
@@ -2725,7 +2733,7 @@ func insertSpendingAddressRow(tx *sql.Tx, fundingTxHash dbtypes.ChainHash, fundi
 		var rowID uint64
 		err := tx.QueryRow(sqlStmt, addrs[i], fundingTxHash, spendingTxHash,
 			spendingTxVinIndex, vinDbID, value, blockTime, isFunding,
-			mainchain && valid, txType).Scan(&rowID)
+			mainchain && valid, txType, spentUtxoData.CoinType, spentUtxoData.SKAValue).Scan(&rowID)
 		if err != nil {
 			return nil, 0, 0, mixed, fmt.Errorf("InsertAddressRow: %w", err)
 		}
@@ -2863,7 +2871,7 @@ func insertTxnsStmt(stmt *sql.Stmt, dbTxns []*dbtypes.Tx) ([]uint64, error) {
 		err := stmt.QueryRow(
 			tx.BlockHash, tx.BlockHeight, tx.BlockTime,
 			tx.TxType, int16(tx.Version), tx.Tree, tx.TxID, tx.BlockIndex,
-			int32(tx.Locktime), int32(tx.Expiry), tx.Size, tx.Spent, tx.Sent, tx.Fees,
+			int32(tx.Locktime), int32(tx.Expiry), tx.Size, tx.Spent, tx.Sent, tx.Fees, dbtypes.ToJSONB(tx.FeesByCoin),
 			tx.MixCount, tx.MixDenom,
 			tx.NumVin, dbtypes.UInt64Array(tx.VinDbIds),
 			tx.NumVout, dbtypes.UInt64Array(tx.VoutDbIds), tx.IsValid,
@@ -2950,12 +2958,16 @@ func retrieveDbTxByHash(ctx context.Context, db *sql.DB, txHash dbtypes.ChainHas
 	dbTx = new(dbtypes.Tx)
 	vinDbIDs := dbtypes.UInt64Array(dbTx.VinDbIds)
 	voutDbIDs := dbtypes.UInt64Array(dbTx.VoutDbIds)
+	var skaFeesJSON []byte
 	err = db.QueryRowContext(ctx, internal.SelectFullTxByHash, txHash).Scan(&id,
 		&dbTx.BlockHash, &dbTx.BlockHeight, &dbTx.BlockTime,
 		&dbTx.TxType, &dbTx.Version, &dbTx.Tree, &dbTx.TxID, &dbTx.BlockIndex,
 		&dbTx.Locktime, &dbTx.Expiry, &dbTx.Size, &dbTx.Spent, &dbTx.Sent,
-		&dbTx.Fees, &dbTx.MixCount, &dbTx.MixDenom, &dbTx.NumVin, &vinDbIDs,
+		&dbTx.Fees, &skaFeesJSON, &dbTx.MixCount, &dbTx.MixDenom, &dbTx.NumVin, &vinDbIDs,
 		&dbTx.NumVout, &voutDbIDs, &dbTx.IsValid, &dbTx.IsMainchainBlock)
+	if len(skaFeesJSON) > 0 {
+		_ = json.Unmarshal(skaFeesJSON, &dbTx.FeesByCoin)
+	}
 	dbTx.VinDbIds = vinDbIDs
 	dbTx.VoutDbIds = voutDbIDs
 	return
@@ -2997,6 +3009,7 @@ func retrieveDbTxsByHash(ctx context.Context, db *sql.DB, txHash dbtypes.ChainHa
 		var id uint64
 		var dbTx dbtypes.Tx
 		var vinids, voutids dbtypes.UInt64Array
+		var skaFeesJSON []byte
 		// vinDbIDs := dbtypes.UInt64Array(dbTx.VinDbIds)
 		// voutDbIDs := dbtypes.UInt64Array(dbTx.VoutDbIds)
 
@@ -3004,10 +3017,13 @@ func retrieveDbTxsByHash(ctx context.Context, db *sql.DB, txHash dbtypes.ChainHa
 			&dbTx.BlockHash, &dbTx.BlockHeight, &dbTx.BlockTime,
 			&dbTx.TxType, &dbTx.Version, &dbTx.Tree, &dbTx.TxID, &dbTx.BlockIndex,
 			&dbTx.Locktime, &dbTx.Expiry, &dbTx.Size, &dbTx.Spent, &dbTx.Sent,
-			&dbTx.Fees, &dbTx.MixCount, &dbTx.MixDenom, &dbTx.NumVin, &vinids,
+			&dbTx.Fees, &skaFeesJSON, &dbTx.MixCount, &dbTx.MixDenom, &dbTx.NumVin, &vinids,
 			&dbTx.NumVout, &voutids, &dbTx.IsValid, &dbTx.IsMainchainBlock)
 		if err != nil {
 			return
+		}
+		if len(skaFeesJSON) > 0 {
+			_ = json.Unmarshal(skaFeesJSON, &dbTx.FeesByCoin)
 		}
 
 		dbTx.VinDbIds = vinids
@@ -3611,7 +3627,10 @@ func insertBlock(db *sql.DB, dbBlock *dbtypes.Block, isValid, isMainchain, check
 		dbBlock.Time, int64(dbBlock.Nonce), int16(dbBlock.VoteBits), dbBlock.Voters,
 		dbBlock.FreshStake, dbBlock.Revocations, dbBlock.PoolSize, int64(dbBlock.Bits),
 		int64(dbBlock.SBits), dbBlock.Difficulty, int32(dbBlock.StakeVersion),
-		dbBlock.PreviousHash, dbBlock.ChainWork, dbtypes.ChainHashArray(dbBlock.Winners)).Scan(&id)
+		dbBlock.PreviousHash, dbBlock.ChainWork, dbtypes.ChainHashArray(dbBlock.Winners),
+		dbtypes.ToJSONB(dbBlock.CoinAmounts),
+		dbtypes.ToJSONB(dbBlock.CoinTxStats),
+		dbtypes.ToJSONB(dbBlock.SSFeeTotalsByCoin)).Scan(&id)
 	return id, err
 }
 
@@ -4357,9 +4376,13 @@ func retrieveBlockSummary(ctx context.Context, db *sql.DB, ind int64) (*apitypes
 	var val, sbits int64
 	var hash dbtypes.ChainHash
 	var timestamp dbtypes.TimeDef
+	var coinAmountsJSON []byte
+	var coinTxStatsJSON []byte
+	var ssfeeJSON []byte
 	err := db.QueryRowContext(ctx, internal.SelectBlockDataByHeight, ind).Scan(
 		&hash, &bd.Height, &bd.Size, &bd.Difficulty, &sbits, &timestamp,
-		&bd.PoolInfo.Size, &val, &winners, &isValid)
+		&bd.PoolInfo.Size, &val, &winners, &isValid, &coinAmountsJSON, &coinTxStatsJSON,
+		&ssfeeJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -4372,7 +4395,9 @@ func retrieveBlockSummary(ctx context.Context, db *sql.DB, ind int64) (*apitypes
 		bd.PoolInfo.Winners[i] = winners[i].String()
 	}
 	bd.StakeDiff = toCoin(sbits)
-
+	_ = json.Unmarshal(coinAmountsJSON, &bd.CoinAmounts)
+	_ = json.Unmarshal(coinTxStatsJSON, &bd.CoinTxStats)
+	_ = json.Unmarshal(ssfeeJSON, &bd.SSFeeTotalsByCoin)
 	return bd, nil
 }
 
@@ -4384,9 +4409,12 @@ func retrieveBlockSummaryByHash(ctx context.Context, db *sql.DB, hash dbtypes.Ch
 	var timestamp dbtypes.TimeDef
 	var val, psize sql.NullInt64 // pool value and size are only stored for mainchain blocks
 	var sbits int64
+	var coinAmountsJSON []byte
+	var coinTxStatsJSON []byte
+	var ssfeeJSON []byte
 	err := db.QueryRowContext(ctx, internal.SelectBlockDataByHash, hash).Scan(
 		&bd.Height, &bd.Size, &bd.Difficulty, &sbits, &timestamp,
-		&psize, &val, &winners, &isMainchain, &isValid)
+		&psize, &val, &winners, &isMainchain, &isValid, &coinAmountsJSON, &coinTxStatsJSON, &ssfeeJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -4400,6 +4428,9 @@ func retrieveBlockSummaryByHash(ctx context.Context, db *sql.DB, hash dbtypes.Ch
 		bd.PoolInfo.Winners[i] = winners[i].String()
 	}
 	bd.StakeDiff = toCoin(sbits)
+	_ = json.Unmarshal(coinAmountsJSON, &bd.CoinAmounts)
+	_ = json.Unmarshal(coinTxStatsJSON, &bd.CoinTxStats)
+	_ = json.Unmarshal(ssfeeJSON, &bd.SSFeeTotalsByCoin)
 	return bd, nil
 }
 
@@ -4433,9 +4464,12 @@ func retrieveBlockSummaryRange(ctx context.Context, db *sql.DB, ind0, ind1 int64
 		var val, sbits int64
 		var timestamp dbtypes.TimeDef
 		var hash dbtypes.ChainHash
+		var coinAmountsJSON []byte
+		var coinTxStatsJSON []byte
+		var ssfeeJSON []byte
 		err := rows.Scan(
 			&hash, &bd.Height, &bd.Size, &bd.Difficulty, &sbits, &timestamp,
-			&bd.PoolInfo.Size, &val, &winners, &isValid,
+			&bd.PoolInfo.Size, &val, &winners, &isValid, &coinAmountsJSON, &coinTxStatsJSON, &ssfeeJSON,
 		)
 		if err != nil {
 			return nil, err
@@ -4449,6 +4483,9 @@ func retrieveBlockSummaryRange(ctx context.Context, db *sql.DB, ind0, ind1 int64
 			bd.PoolInfo.Winners[i] = winners[i].String()
 		}
 		bd.StakeDiff = toCoin(sbits)
+		_ = json.Unmarshal(coinAmountsJSON, &bd.CoinAmounts)
+		_ = json.Unmarshal(coinTxStatsJSON, &bd.CoinTxStats)
+		_ = json.Unmarshal(ssfeeJSON, &bd.SSFeeTotalsByCoin)
 		blocks = append(blocks, bd)
 	}
 	if err = rows.Err(); err != nil {
@@ -4491,9 +4528,12 @@ func retrieveBlockSummaryRangeStepped(ctx context.Context, db *sql.DB, ind0, ind
 		var val, sbits int64
 		var timestamp dbtypes.TimeDef
 		var hash dbtypes.ChainHash
+		var coinAmountsJSON []byte
+		var coinTxStatsJSON []byte
+		var ssfeeJSON []byte
 		err := rows.Scan(
 			&hash, &bd.Height, &bd.Size, &bd.Difficulty, &sbits, &timestamp,
-			&bd.PoolInfo.Size, &val, &winners, &isValid,
+			&bd.PoolInfo.Size, &val, &winners, &isValid, &coinAmountsJSON, &coinTxStatsJSON, &ssfeeJSON,
 		)
 		if err != nil {
 			return nil, err
@@ -4507,6 +4547,9 @@ func retrieveBlockSummaryRangeStepped(ctx context.Context, db *sql.DB, ind0, ind
 			bd.PoolInfo.Winners[i] = winners[i].String()
 		}
 		bd.StakeDiff = toCoin(sbits)
+		_ = json.Unmarshal(coinAmountsJSON, &bd.CoinAmounts)
+		_ = json.Unmarshal(coinTxStatsJSON, &bd.CoinTxStats)
+		_ = json.Unmarshal(ssfeeJSON, &bd.SSFeeTotalsByCoin)
 		blocks = append(blocks, bd)
 	}
 	if err = rows.Err(); err != nil {

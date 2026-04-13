@@ -7,19 +7,21 @@ package blockdata
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/dcrutil/v4"
-	chainjson "github.com/decred/dcrd/rpc/jsonrpc/types/v4"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
+	"github.com/monetarium/monetarium-node/cointype"
+	"github.com/monetarium/monetarium-node/dcrutil"
+	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
+	"github.com/monetarium/monetarium-node/wire"
 
-	apitypes "github.com/decred/dcrdata/v8/api/types"
-	"github.com/decred/dcrdata/v8/db/dbtypes"
-	"github.com/decred/dcrdata/v8/stakedb"
-	"github.com/decred/dcrdata/v8/txhelpers"
+	apitypes "github.com/monetarium/monetarium-explorer/api/types"
+	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	"github.com/monetarium/monetarium-explorer/stakedb"
+	"github.com/monetarium/monetarium-explorer/txhelpers"
 )
 
 // BlockData contains all the data collected by a Collector and stored
@@ -236,6 +238,31 @@ func (t *Collector) CollectBlockInfo(hash *chainhash.Hash) (*apitypes.BlockDataB
 		CoinSupply:       int64(coinSupply),
 		NextBlockSubsidy: nbSubsidy,
 	}
+
+	// Accumulate per-coin output totals from all transactions in the block.
+	coinAmounts := blockCoinAmounts(msgBlock)
+	if len(coinAmounts) > 0 {
+		blockdata.CoinAmounts = coinAmounts
+		extrainfo.CoinAmounts = coinAmounts
+	}
+
+	// Accumulate per-coin tx count and size.
+	coinTxStats := blockCoinTxStats(msgBlock)
+	if len(coinTxStats) > 0 {
+		blockdata.CoinTxStats = coinTxStats
+		extrainfo.CoinTxStats = coinTxStats
+	}
+
+	// Accumulate per-coin SSFee totals for SKA vote reward calculation.
+	if ssfee := txhelpers.BlockSSFeeTotals(msgBlock); len(ssfee) > 0 {
+		extrainfo.SSFeeTotalsByCoin = ssfee
+	}
+
+	// Extract per-SKA-type PoW mining reward amounts from the coinbase.
+	if skaRewards := blockSKAPoWRewards(msgBlock); len(skaRewards) > 0 {
+		extrainfo.SKAPoWRewards = skaRewards
+	}
+
 	return blockdata, feeInfoBlock, blockHeaderResults, extrainfo, msgBlock, err
 }
 
@@ -371,4 +398,97 @@ func (t *Collector) Collect() (*BlockData, *wire.MsgBlock, error) {
 	}
 
 	return blockdata, msgBlock, err
+}
+
+// blockCoinTxStats returns per-coin tx count and total serialized size for all
+// transactions in a block (key 0=VAR, 1-255=SKA-n). Returns nil for empty blocks.
+func blockCoinTxStats(msgBlock *wire.MsgBlock) map[uint8]apitypes.CoinTxStats {
+	stats := make(map[uint8]apitypes.CoinTxStats)
+	allTxs := append(msgBlock.Transactions, msgBlock.STransactions...)
+	for _, tx := range allTxs {
+		ct := uint8(cointype.CoinTypeVAR)
+		for _, txout := range tx.TxOut {
+			if txout.CoinType.IsSKA() {
+				ct = uint8(txout.CoinType)
+				break
+			}
+		}
+		s := stats[ct]
+		s.TxCount++
+		s.Size += uint32(tx.SerializeSize())
+		stats[ct] = s
+	}
+	if len(stats) == 0 {
+		return nil
+	}
+	return stats
+}
+
+// blockCoinAmounts iterates all transactions in a block and returns a map of
+// per-coin output totals as decimal atom strings (key 0=VAR, 1-255=SKA-n).
+func blockCoinAmounts(msgBlock *wire.MsgBlock) map[uint8]string {
+	var varTotal int64
+	skaTotal := make(map[uint8]*big.Int)
+
+	allTxs := append(msgBlock.Transactions, msgBlock.STransactions...)
+	for _, tx := range allTxs {
+		for _, txout := range tx.TxOut {
+			ct := txout.CoinType
+			if ct == cointype.CoinTypeVAR {
+				varTotal += txout.Value
+			} else if ct.IsSKA() && txout.SKAValue != nil {
+				k := uint8(ct)
+				if cur, ok := skaTotal[k]; ok {
+					cur.Add(cur, txout.SKAValue)
+				} else {
+					skaTotal[k] = new(big.Int).Set(txout.SKAValue)
+				}
+			}
+		}
+	}
+
+	if varTotal == 0 && len(skaTotal) == 0 {
+		return nil
+	}
+
+	out := make(map[uint8]string, 1+len(skaTotal))
+	if varTotal != 0 {
+		out[0] = fmt.Sprintf("%d", varTotal)
+	}
+	for k, v := range skaTotal {
+		out[k] = v.String()
+	}
+	return out
+}
+
+// blockSKAPoWRewards extracts per-SKA-type PoW mining reward amounts from the
+// coinbase transaction of a block. Only SKA outputs (CoinType 1-255) from the
+// coinbase are considered, as those represent the miner's SKA reward.
+func blockSKAPoWRewards(msgBlock *wire.MsgBlock) map[uint8]string {
+	if len(msgBlock.Transactions) == 0 {
+		return nil
+	}
+	coinbase := msgBlock.Transactions[0]
+	skaRewards := make(map[uint8]*big.Int)
+
+	for _, txout := range coinbase.TxOut {
+		if txout.CoinType.IsSKA() && txout.SKAValue != nil {
+			ct := uint8(txout.CoinType)
+			if cur, ok := skaRewards[ct]; ok {
+				cur.Add(cur, txout.SKAValue)
+			} else {
+				skaRewards[ct] = new(big.Int).Set(txout.SKAValue)
+			}
+		}
+	}
+
+	if len(skaRewards) == 0 {
+		return nil
+	}
+
+	out := make(map[uint8]string, len(skaRewards))
+	for k, v := range skaRewards {
+		out[k] = v.String()
+	}
+	return out
 }

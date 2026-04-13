@@ -17,21 +17,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/decred/dcrd/blockchain/stake/v5"
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/monetarium/monetarium-node/blockchain/stake"
+	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
 
-	"github.com/decred/dcrd/dcrutil/v4"
-	"github.com/decred/dcrd/txscript/v4/stdaddr"
-	"github.com/decred/dcrd/txscript/v4/stdscript"
+	"github.com/monetarium/monetarium-node/dcrutil"
+	"github.com/monetarium/monetarium-node/txscript/stdaddr"
+	"github.com/monetarium/monetarium-node/txscript/stdscript"
 
-	"github.com/decred/dcrdata/exchanges/v3"
-	"github.com/decred/dcrdata/gov/v6/agendas"
-	pitypes "github.com/decred/dcrdata/gov/v6/politeia/types"
-	"github.com/decred/dcrdata/v8/db/dbtypes"
-	"github.com/decred/dcrdata/v8/explorer/types"
-	"github.com/decred/dcrdata/v8/txhelpers"
 	ticketvotev1 "github.com/decred/politeia/politeiawww/api/ticketvote/v1"
+	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	"github.com/monetarium/monetarium-explorer/exchanges"
+	"github.com/monetarium/monetarium-explorer/explorer/types"
+	"github.com/monetarium/monetarium-explorer/gov/agendas"
+	pitypes "github.com/monetarium/monetarium-explorer/gov/politeia/types"
+	"github.com/monetarium/monetarium-explorer/txhelpers"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -60,7 +60,6 @@ type CommonPageData struct {
 	Version       string
 	ChainParams   *chaincfg.Params
 	BlockTimeUnix int64
-	DevAddress    string
 	Links         *links
 	NetName       string
 	Cookies       Cookies
@@ -178,12 +177,6 @@ func (exp *explorerUI) Home(w http.ResponseWriter, r *http.Request) {
 	}
 
 	blocks := exp.dataSource.GetExplorerBlocks(ctx, int(height), int(height)-8)
-	var bestBlock *types.BlockBasic
-	if blocks == nil {
-		bestBlock = new(types.BlockBasic)
-	} else {
-		bestBlock = blocks[0]
-	}
 
 	// Safely retrieve the current inventory pointer.
 	inv := exp.MempoolInventory()
@@ -192,20 +185,16 @@ func (exp *explorerUI) Home(w http.ResponseWriter, r *http.Request) {
 	inv.RLock()
 	exp.pageData.RLock()
 
-	tallys, consensus := inv.VotingInfo.BlockStatus(bestBlock.Hash)
-
 	// Get fiat conversions if available
 	homeInfo := exp.pageData.HomeInfo
 	var conversions *homeConversions
 	xcBot := exp.xcBot
 	if xcBot != nil {
 		conversions = &homeConversions{
-			ExchangeRate:    xcBot.Conversion(1.0),
-			StakeDiff:       xcBot.Conversion(homeInfo.StakeDiff),
-			CoinSupply:      xcBot.Conversion(dcrutil.Amount(homeInfo.CoinSupply).ToCoin()),
-			PowSplit:        xcBot.Conversion(dcrutil.Amount(homeInfo.NBlockSubsidy.PoW).ToCoin()),
-			TreasurySplit:   xcBot.Conversion(dcrutil.Amount(homeInfo.NBlockSubsidy.Dev).ToCoin()),
-			TreasuryBalance: xcBot.Conversion(dcrutil.Amount(homeInfo.DevFund + homeInfo.TreasuryBalance.Balance).ToCoin()),
+			ExchangeRate: xcBot.Conversion(1.0),
+			StakeDiff:    xcBot.Conversion(homeInfo.StakeDiff),
+			CoinSupply:   xcBot.Conversion(dcrutil.Amount(homeInfo.CoinSupply).ToCoin()),
+			PowSplit:     xcBot.Conversion(dcrutil.Amount(homeInfo.NBlockSubsidy.PoW).ToCoin()),
 		}
 	}
 
@@ -213,20 +202,14 @@ func (exp *explorerUI) Home(w http.ResponseWriter, r *http.Request) {
 		*CommonPageData
 		Info          *types.HomeInfo
 		Mempool       *types.MempoolInfo
-		BestBlock     *types.BlockBasic
-		BlockTally    []int
-		Consensus     int
-		Blocks        []*types.BlockBasic
+		Blocks        []HomeBlockRow
 		Conversions   *homeConversions
 		PercentChange float64
 	}{
 		CommonPageData: exp.commonData(r),
 		Info:           homeInfo,
 		Mempool:        inv,
-		BestBlock:      bestBlock,
-		BlockTally:     tallys,
-		Consensus:      consensus,
-		Blocks:         blocks,
+		Blocks:         buildHomeBlockRows(blocks),
 		Conversions:    conversions,
 		PercentChange:  homeInfo.PoolInfo.PercentTarget - 100,
 	})
@@ -909,6 +892,7 @@ func (exp *explorerUI) TxPage(w http.ResponseWriter, r *http.Request) {
 				// VoteInfo TODO - check votes table
 				Coinbase:     dbTx0.BlockIndex == 0 && dbTx0.Tree == wire.TxTreeRegular,
 				Treasurybase: stake.TxType(txType) == stake.TxTypeTreasuryBase,
+				SKASent:      dbTx0.SentByCoin,
 			},
 			SpendingTxns: make([]types.TxInID, len(dbTx0.VoutDbIds)), // SpendingTxns filled below
 			// Vins - looked-up in vins table
@@ -960,18 +944,23 @@ func (exp *explorerUI) TxPage(w http.ResponseWriter, r *http.Request) {
 				log.Warnf("SpendingTransaction failed for outpoint %s:%d: %v",
 					hash, vouts[iv].TxIndex, err)
 			}
-			amount := dcrutil.Amount(int64(vouts[iv].Value)).ToCoin()
-			tx.Vout = append(tx.Vout, types.Vout{
-				Addresses:       vouts[iv].ScriptPubKeyData.Addresses,
-				Amount:          amount,
-				FormattedAmount: humanize.Commaf(amount),
-				Type:            vouts[iv].ScriptPubKeyData.Type.String(),
-				Spent:           spendingTx != "",
-				// OP_RETURN:       opReturn,
-				// OP_TADD:         opTAdd,
-				Index:   vouts[iv].TxIndex,
-				Version: vouts[iv].Version,
-			})
+			vout := types.Vout{
+				Addresses: vouts[iv].ScriptPubKeyData.Addresses,
+				Type:      vouts[iv].ScriptPubKeyData.Type.String(),
+				Spent:     spendingTx != "",
+				Index:     vouts[iv].TxIndex,
+				Version:   vouts[iv].Version,
+				CoinType:  vouts[iv].CoinType,
+				SKAValue:  vouts[iv].SKAValue,
+			}
+			if vouts[iv].CoinType == 0 {
+				amount := dcrutil.Amount(int64(vouts[iv].Value)).ToCoin()
+				vout.Amount = amount
+				vout.FormattedAmount = humanize.Commaf(amount)
+			} else {
+				vout.FormattedAmount = types.FormatSKAAmount(vouts[iv].SKAValue, vouts[iv].CoinType, true)
+			}
+			tx.Vout = append(tx.Vout, vout)
 		}
 
 		// Retrieve vins from DB.
@@ -1003,7 +992,14 @@ func (exp *explorerUI) TxPage(w http.ResponseWriter, r *http.Request) {
 			asm, _ := txscript.DisasmString(vins[iv].ScriptSig)
 
 			txIndex := vins[iv].TxIndex
-			amount := dcrutil.Amount(vins[iv].ValueIn).ToCoin()
+			var formattedAmt string
+			var amountIn float64
+			if vins[iv].CoinType == 0 {
+				amountIn = dcrutil.Amount(vins[iv].ValueIn).ToCoin()
+				formattedAmt = humanize.Commaf(amountIn)
+			} else {
+				formattedAmt = types.FormatSKAAmount(vins[iv].SKAValue, vins[iv].CoinType, true)
+			}
 			var coinbase, stakebase, tspend string
 			var treasuryBase bool
 			if txIndex == 0 {
@@ -1027,7 +1023,7 @@ func (exp *explorerUI) TxPage(w http.ResponseWriter, r *http.Request) {
 					Vout:          vins[iv].PrevTxIndex,
 					Tree:          dbTx0.Tree,
 					Sequence:      vins[iv].Sequence,
-					AmountIn:      amount,
+					AmountIn:      amountIn,
 					BlockHeight:   uint32(tx.BlockHeight),
 					BlockIndex:    tx.BlockIndex,
 					ScriptSig: &chainjson.ScriptSig{
@@ -1036,8 +1032,10 @@ func (exp *explorerUI) TxPage(w http.ResponseWriter, r *http.Request) {
 					},
 				},
 				Addresses:       []string{"unknown"}, // addresses,
-				FormattedAmount: humanize.Commaf(amount),
+				FormattedAmount: formattedAmt,
 				Index:           txIndex,
+				CoinType:        vins[iv].CoinType,
+				SKAValue:        vins[iv].SKAValue,
 			})
 		}
 
@@ -1425,7 +1423,8 @@ type TreasuryInfo struct {
 
 // TreasuryPage is the page handler for the "/treasury" path
 func (exp *explorerUI) TreasuryPage(w http.ResponseWriter, r *http.Request) {
-	ctx := context.WithValue(r.Context(), ctxAddress, exp.pageData.HomeInfo.DevAddress)
+	// Note: Monetarium does not have a treasury, so using empty address
+	ctx := context.WithValue(r.Context(), ctxAddress, "")
 	r = r.WithContext(ctx)
 	if queryVals := r.URL.Query(); queryVals.Get("txntype") == "" {
 		queryVals.Set("txntype", "tspend")
@@ -1472,9 +1471,9 @@ func (exp *explorerUI) TreasuryPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exp.pageData.RLock()
-	treasuryBalance := exp.pageData.HomeInfo.TreasuryBalance
-	exp.pageData.RUnlock()
+	// TreasuryBalance is not available in Monetarium (no treasury)
+	// Return empty balance for template compatibility
+	treasuryBalance := &dbtypes.TreasuryBalance{}
 
 	typeCount := treasuryTypeCount(treasuryBalance, txType)
 
@@ -1719,9 +1718,8 @@ func (exp *explorerUI) TreasuryTable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exp.pageData.RLock()
-	bal := exp.pageData.HomeInfo.TreasuryBalance
-	exp.pageData.RUnlock()
+	// TreasuryBalance is not available in Monetarium (no treasury)
+	bal := &dbtypes.TreasuryBalance{}
 
 	linkTemplate := "/treasury" + "?start=%d&n=" + strconv.FormatInt(limitN, 10) + "&txntype=" + fmt.Sprintf("%v", txType)
 
@@ -2526,7 +2524,7 @@ func (exp *explorerUI) commonData(r *http.Request) *CommonPageData {
 	}
 	darkMode, err := r.Cookie(darkModeCoookie)
 	if err != nil && err != http.ErrNoCookie {
-		log.Errorf("Cookie dcrdataDarkBG retrieval error: %v", err)
+		log.Errorf("Cookie monetariumDarkBG retrieval error: %v", err)
 	}
 
 	scheme := r.URL.Scheme
@@ -2544,7 +2542,6 @@ func (exp *explorerUI) commonData(r *http.Request) *CommonPageData {
 		Version:       exp.Version,
 		ChainParams:   exp.ChainParams,
 		BlockTimeUnix: int64(exp.ChainParams.TargetTimePerBlock.Seconds()),
-		DevAddress:    exp.pageData.HomeInfo.DevAddress,
 		NetName:       exp.NetName,
 		Links:         explorerLinks,
 		Cookies: Cookies{

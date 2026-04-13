@@ -7,20 +7,21 @@ package rpcutils
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"strconv"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/dcrutil/v4"
-	chainjson "github.com/decred/dcrd/rpc/jsonrpc/types/v4"
-	"github.com/decred/dcrd/rpcclient/v8"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
+	"github.com/monetarium/monetarium-node/dcrutil"
+	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
+	"github.com/monetarium/monetarium-node/rpcclient"
+	"github.com/monetarium/monetarium-node/wire"
 
-	"github.com/decred/dcrdata/v8/semver"
-	"github.com/decred/dcrdata/v8/txhelpers"
+	"github.com/monetarium/monetarium-explorer/semver"
+	"github.com/monetarium/monetarium-explorer/txhelpers"
 )
 
 type MempoolGetter interface {
@@ -55,14 +56,28 @@ func (cl *AsyncTxClient) GetRawTransactionVerbosePromise(ctx context.Context, tx
 	return cl.Client.GetRawTransactionVerboseAsync(ctx, txHash)
 }
 
-var _ txhelpers.VerboseTransactionPromiseGetter = (*AsyncTxClient)(nil)
-
 // GetRawTransactionPromise gives txhelpers.TransactionPromiseGetter.
 func (cl *AsyncTxClient) GetRawTransactionPromise(ctx context.Context, txHash *chainhash.Hash) txhelpers.TxReceiver {
 	return cl.Client.GetRawTransactionAsync(ctx, txHash)
 }
 
+var _ txhelpers.VerboseTransactionPromiseGetter = (*AsyncTxClient)(nil)
 var _ txhelpers.TransactionPromiseGetter = (*AsyncTxClient)(nil)
+
+// GetBurnedCoins returns the burn statistics for all coin types.
+func GetBurnedCoins(ctx context.Context, client *rpcclient.Client) (*chainjson.GetBurnedCoinsResult, error) {
+	res, err := client.RawRequest(ctx, "getburnedcoins", []json.RawMessage{json.RawMessage("null")})
+	if err != nil {
+		return nil, err
+	}
+
+	var result chainjson.GetBurnedCoinsResult
+	if err := json.Unmarshal(res, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
 
 // NewAsyncTxClient creates an AsyncTxClient from a rpcclient.Client.
 func NewAsyncTxClient(c *rpcclient.Client) *AsyncTxClient {
@@ -72,8 +87,8 @@ func NewAsyncTxClient(c *rpcclient.Client) *AsyncTxClient {
 // Any of the following dcrd RPC API versions are deemed compatible with
 // dcrdata.
 var compatibleChainServerAPIs = []semver.Semver{
-	semver.NewSemver(7, 0, 0),
-	semver.NewSemver(8, 0, 0), // removed methods we no longer use i.e. searchrawtransactions
+	semver.NewSemver(8, 0, 0),
+	semver.NewSemver(8, 3, 0), // monetarium-node v1.0.14
 }
 
 var (
@@ -137,7 +152,7 @@ func ConnectNodeRPC(host, user, pass, cert string, disableTLS, disableReconnect 
 		return nil, nodeVer, fmt.Errorf("unable to get node RPC version")
 	}
 
-	dcrdVer := ver["dcrdjsonrpcapi"]
+	dcrdVer := ver["monetariumjsonrpcapi"]
 	nodeVer = semver.NewSemver(dcrdVer.Major, dcrdVer.Minor, dcrdVer.Patch)
 
 	// Check if the dcrd RPC API version is compatible with dcrdata.

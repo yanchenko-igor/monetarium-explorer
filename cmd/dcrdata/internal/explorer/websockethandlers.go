@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	apitypes "github.com/decred/dcrdata/v8/api/types"
-	"github.com/decred/dcrdata/v8/db/dbtypes"
-	"github.com/decred/dcrdata/v8/explorer/types"
-	pstypes "github.com/decred/dcrdata/v8/pubsub/types"
+	apitypes "github.com/monetarium/monetarium-explorer/api/types"
+	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	"github.com/monetarium/monetarium-explorer/explorer/types"
+	pstypes "github.com/monetarium/monetarium-explorer/pubsub/types"
 	"golang.org/x/net/websocket"
 )
 
@@ -297,14 +297,30 @@ func (exp *explorerUI) RootWebsocket(w http.ResponseWriter, r *http.Request) {
 					webData.Message = strconv.Itoa(exp.wsHub.NumClients())
 				case sigNewTxs:
 					// Do not use any tx slice in sig.Msg. Instead use client's
-					// new transactions slice, newTxs.
+					// new transactions slice, newTxs. Attach current fill data
+					// so the client can update indicators without waiting for
+					// the next mempool event.
+					inv := exp.MempoolInventory()
+					inv.RLock()
+					newTxsPayload := struct {
+						Txs            []*types.MempoolTx   `json:"txs"`
+						CoinFills      []types.CoinFillData `json:"coin_fills"`
+						TotalFillRatio float64              `json:"total_fill_ratio"`
+						ActiveSKACount int                  `json:"active_ska_count"`
+					}{
+						CoinFills:      inv.MempoolShort.CoinFills,
+						TotalFillRatio: inv.MempoolShort.TotalFillRatio,
+						ActiveSKACount: inv.MempoolShort.ActiveSKACount,
+					}
+					inv.RUnlock()
 					clientData.RLock()
-					err := enc.Encode(clientData.newTxs)
+					newTxsPayload.Txs = clientData.newTxs
 					clientData.RUnlock()
+					err := enc.Encode(newTxsPayload)
 					if err == nil {
 						webData.Message = buff.String()
 					} else {
-						log.Errorf("json.Encode([]*MempoolTx) failed: %v", err)
+						log.Errorf("json.Encode(newTxsPayload) failed: %v", err)
 					}
 
 				case sigSyncStatus:

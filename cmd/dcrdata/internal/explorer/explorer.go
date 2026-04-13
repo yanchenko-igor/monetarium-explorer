@@ -9,6 +9,7 @@ package explorer
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
@@ -16,27 +17,28 @@ import (
 	"os"
 	"os/signal"
 	"reflect"
-	"runtime"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/decred/dcrd/blockchain/stake/v5"
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/dcrutil/v4"
-	chainjson "github.com/decred/dcrd/rpc/jsonrpc/types/v4"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/monetarium-node/blockchain/stake"
+	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/chaincfg/chainhash"
+	"github.com/monetarium/monetarium-node/dcrutil"
+	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
+	"github.com/monetarium/monetarium-node/wire"
 
-	"github.com/decred/dcrdata/exchanges/v3"
-	"github.com/decred/dcrdata/gov/v6/agendas"
-	pitypes "github.com/decred/dcrdata/gov/v6/politeia/types"
-	"github.com/decred/dcrdata/v8/blockdata"
-	"github.com/decred/dcrdata/v8/db/dbtypes"
-	"github.com/decred/dcrdata/v8/explorer/types"
-	"github.com/decred/dcrdata/v8/mempool"
-	pstypes "github.com/decred/dcrdata/v8/pubsub/types"
-	"github.com/decred/dcrdata/v8/txhelpers"
+	apitypes "github.com/monetarium/monetarium-explorer/api/types"
+	"github.com/monetarium/monetarium-explorer/blockdata"
+	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	"github.com/monetarium/monetarium-explorer/exchanges"
+	"github.com/monetarium/monetarium-explorer/explorer/types"
+	"github.com/monetarium/monetarium-explorer/gov/agendas"
+	pitypes "github.com/monetarium/monetarium-explorer/gov/politeia/types"
+	"github.com/monetarium/monetarium-explorer/mempool"
+	pstypes "github.com/monetarium/monetarium-explorer/pubsub/types"
+	"github.com/monetarium/monetarium-explorer/txhelpers"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -117,6 +119,9 @@ type explorerDataSource interface {
 	GetExplorerFullBlocks(ctx context.Context, start int, end int) []*types.BlockInfo
 	CurrentDifficulty(context.Context) (float64, error)
 	Difficulty(ctx context.Context, timestamp int64) float64
+	GetSummaryRange(ctx context.Context, idx0, idx1 int) []*apitypes.BlockDataBasic
+	VARCoinSupply(ctx context.Context) (*types.VARCoinSupply, error)
+	SKACoinSupply(ctx context.Context) ([]*types.SKACoinSupplyEntry, error)
 }
 
 type PoliteiaBackend interface {
@@ -161,8 +166,8 @@ var explorerLinks = &links{
 	POSExplanation:  "https://docs.decred.org/proof-of-stake/overview/",
 	APIDocs:         "https://github.com/decred/dcrdata#apis",
 	InsightAPIDocs:  "https://github.com/decred/dcrdata/blob/master/docs/Insight_API_documentation.md",
-	Github:          "https://github.com/decred/dcrdata",
-	License:         "https://github.com/decred/dcrdata/blob/master/LICENSE",
+	Github:          "https://github.com/monetarium/monetarium-explorer",
+	License:         "https://github.com/monetarium/monetarium-explorer/blob/main/LICENSE",
 	NetParams:       "https://github.com/decred/dcrd/blob/master/chaincfg/params.go",
 	DownloadLink:    "https://decred.org/wallets/",
 }
@@ -230,9 +235,10 @@ type explorerUI struct {
 	displaySyncStatusPage atomic.Value
 	politeiaURL           string
 
-	invsMtx sync.RWMutex
-	invs    *types.MempoolInfo
-	premine int64
+	invsMtx  sync.RWMutex
+	invs     *types.MempoolInfo
+	premine  int64
+	manifest map[string]string
 }
 
 // AreDBsSyncing is a thread-safe way to fetch the boolean in dbsSyncing.
@@ -283,21 +289,22 @@ func (exp *explorerUI) StopWebsocketHub() {
 
 // ExplorerConfig is the configuration settings for explorerUI.
 type ExplorerConfig struct {
-	DataSource    explorerDataSource
-	ChartSource   ChartDataSource
-	UseRealIP     bool
-	AppVersion    string
-	DevPrefetch   bool
-	Viewsfolder   string
-	XcBot         *exchanges.ExchangeBot
-	AgendasSource agendaBackend
-	Tracker       *agendas.VoteTracker
-	Proposals     PoliteiaBackend
-	PoliteiaURL   string
-	MainnetLink   string
-	TestnetLink   string
-	OnionAddress  string
-	ReloadHTML    bool
+	DataSource        explorerDataSource
+	ChartSource       ChartDataSource
+	UseRealIP         bool
+	AppVersion        string
+	DevPrefetch       bool
+	Viewsfolder       string
+	XcBot             *exchanges.ExchangeBot
+	AgendasSource     agendaBackend
+	Tracker           *agendas.VoteTracker
+	Proposals         PoliteiaBackend
+	PoliteiaURL       string
+	MainnetLink       string
+	TestnetLink       string
+	OnionAddress      string
+	ReloadHTML        bool
+	AssetManifestPath string
 }
 
 // New returns an initialized instance of explorerUI
@@ -351,7 +358,6 @@ func New(cfg *ExplorerConfig) *explorerUI {
 	exp.pageData = &pageData{
 		BlockInfo: new(types.BlockInfo),
 		HomeInfo: &types.HomeInfo{
-			DevAddress: devSubsidyAddress,
 			Params: types.ChainParams{
 				WindowSize:       exp.ChainParams.StakeDiffWindowSize,
 				RewardWindowSize: exp.ChainParams.SubsidyReductionInterval,
@@ -367,8 +373,27 @@ func New(cfg *ExplorerConfig) *explorerUI {
 
 	log.Infof("Mean Voting Blocks calculated: %d", exp.pageData.HomeInfo.Params.MeanVotingBlocks)
 
-	commonTemplates := []string{"extras"}
-	exp.templates = newTemplates(cfg.Viewsfolder, cfg.ReloadHTML, commonTemplates, makeTemplateFuncMap(exp.ChainParams))
+	// Load webpack manifest for cache-busted asset URLs.
+	if cfg.AssetManifestPath != "" {
+		if manifestData, err := os.ReadFile(cfg.AssetManifestPath); err != nil {
+			log.Warnf("Could not read asset manifest: %v", err)
+		} else if err = json.Unmarshal(manifestData, &exp.manifest); err != nil {
+			log.Warnf("Could not parse asset manifest: %v", err)
+		} else {
+			log.Infof("Loaded asset manifest with %d entries", len(exp.manifest))
+		}
+	}
+
+	funcMap := makeTemplateFuncMap(exp.ChainParams)
+	funcMap["asset"] = func(name string) string {
+		if hashed, ok := exp.manifest[name]; ok {
+			return hashed
+		}
+		return "/dist/" + name
+	}
+
+	commonTemplates := []string{"extras", "home_latest_blocks", "home_mempool", "home_voting", "home_mining", "home_supply"}
+	exp.templates = newTemplates(cfg.Viewsfolder, cfg.ReloadHTML, commonTemplates, funcMap)
 
 	tmpls := []string{"home", "blocks", "mempool", "block", "tx", "address",
 		"rawtx", "status", "parameters", "agenda", "agendas", "charts",
@@ -448,6 +473,20 @@ func (exp *explorerUI) MempoolSignal() chan<- pstypes.HubMessage {
 // []types.MempoolTx so that it may be modified (e.g. sorted) without affecting
 // other MempoolDataSavers.
 func (exp *explorerUI) StoreMPData(_ *mempool.StakeData, _ []types.MempoolTx, inv *types.MempoolInfo) {
+	exp.pageData.RLock()
+	blockchainInfo := exp.pageData.BlockchainInfo
+	exp.pageData.RUnlock()
+
+	maxBlockSize := 393216.0
+	if blockchainInfo != nil && blockchainInfo.MaxBlockSize > 0 {
+		maxBlockSize = float64(blockchainInfo.MaxBlockSize)
+	}
+	fills, totalFillRatio, activeSKACount := computeCoinFills(inv.CoinStats, maxBlockSize)
+	inv.CoinFills = fills
+	inv.MempoolShort.CoinFills = fills
+	inv.MempoolShort.TotalFillRatio = totalFillRatio
+	inv.MempoolShort.ActiveSKACount = activeSKACount
+
 	// Get exclusive access to the Mempool field.
 	exp.invsMtx.Lock()
 	exp.invs = inv
@@ -489,12 +528,6 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 		stakePerc = blockData.PoolInfo.Value / dcrutil.Amount(blockData.ExtraInfo.CoinSupply).ToCoin()
 	}
 
-	treasuryBalance, err := exp.dataSource.TreasuryBalance(ctx)
-	if err != nil {
-		log.Errorf("Store: TreasuryBalance failed: %v", err)
-		treasuryBalance = &dbtypes.TreasuryBalance{}
-	}
-
 	// Update pageData with block data and chain (home) info.
 	p := exp.pageData
 	p.Lock()
@@ -515,11 +548,29 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 	p.HomeInfo.IdxBlockInWindow = blockData.IdxBlockInWindow
 	p.HomeInfo.IdxInRewardWindow = int(newBlockData.Height%exp.ChainParams.SubsidyReductionInterval) + 1
 	p.HomeInfo.Difficulty = difficulty
-	p.HomeInfo.TreasuryBalance = treasuryBalance
 	p.HomeInfo.NBlockSubsidy.Dev = blockData.ExtraInfo.NextBlockSubsidy.Developer
 	p.HomeInfo.NBlockSubsidy.PoS = blockData.ExtraInfo.NextBlockSubsidy.PoS
 	p.HomeInfo.NBlockSubsidy.PoW = blockData.ExtraInfo.NextBlockSubsidy.PoW
 	p.HomeInfo.NBlockSubsidy.Total = blockData.ExtraInfo.NextBlockSubsidy.Total
+
+	// New Supply section data
+	varSupply, err := exp.dataSource.VARCoinSupply(ctx)
+	if err != nil {
+		log.Errorf("Store: VARCoinSupply failed: %v", err)
+	} else {
+		p.HomeInfo.VARCoinSupply = varSupply
+	}
+	skaSupply, err := exp.dataSource.SKACoinSupply(ctx)
+	if err != nil {
+		log.Errorf("Store: SKACoinSupply failed: %v", err)
+	} else {
+		// Convert []*types.SKACoinSupplyEntry to []types.SKACoinSupplyEntry
+		entries := make([]types.SKACoinSupplyEntry, len(skaSupply))
+		for i, e := range skaSupply {
+			entries[i] = *e
+		}
+		p.HomeInfo.SKACoinSupply = entries
+	}
 
 	// If BlockData contains non-nil PoolInfo, copy values.
 	p.HomeInfo.PoolInfo = types.TicketPoolInfo{}
@@ -537,8 +588,14 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 
 	posSubsPerVote := dcrutil.Amount(blockData.ExtraInfo.NextBlockSubsidy.PoS).ToCoin() /
 		float64(exp.ChainParams.TicketsPerBlock)
-	p.HomeInfo.TicketReward = 100 * posSubsPerVote /
-		blockData.CurrentStakeDiff.CurrentStakeDifficulty
+	ticketRewardPct := 100 * posSubsPerVote / blockData.CurrentStakeDiff.CurrentStakeDifficulty
+	p.HomeInfo.TicketReward = ticketRewardPct
+	p.HomeInfo.VoteVARReward = types.VoteVARReward{
+		PerBlock:  posSubsPerVote,
+		Per30Days: ticketRewardPct,
+		// PerYear (ASR) is computed asynchronously below; set placeholder here.
+		PerYear: p.HomeInfo.ASR,
+	}
 
 	// The actual reward of a ticket needs to also take into consideration the
 	// ticket maturity (time from ticket purchase until its eligible to vote)
@@ -549,6 +606,76 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 		int64(exp.ChainParams.CoinbaseMaturity)
 	p.HomeInfo.RewardPeriod = fmt.Sprintf("%.2f days", float64(avgSSTxToSSGenMaturity)*
 		exp.ChainParams.TargetTimePerBlock.Hours()/24)
+
+	// Compute per-SKA vote rewards. Averages are always computed from
+	// historical summaries so they survive SKA-free blocks. PerBlock is only
+	// populated when the current block contains SKA fee data.
+	voters := int64(blockData.Header.Voters)
+
+	blocksIn30Days := int(30 * 24 * time.Hour / exp.ChainParams.TargetTimePerBlock)
+	tip := int(exp.dataSource.Height())
+	start30 := tip - blocksIn30Days
+	if start30 < 0 {
+		start30 = 0
+	}
+	startYear := tip - blocksIn30Days*12
+	if startYear < 0 {
+		startYear = 0
+	}
+	sum30 := exp.dataSource.GetSummaryRange(ctx, start30, tip)
+	sumYear := exp.dataSource.GetSummaryRange(ctx, startYear, tip)
+	toSummaries := func(blocks []*apitypes.BlockDataBasic) []txhelpers.SSFeeSummary {
+		s := make([]txhelpers.SSFeeSummary, len(blocks))
+		for i, b := range blocks {
+			s[i] = txhelpers.SSFeeSummary{SSFeeTotalsByCoin: b.SSFeeTotalsByCoin, StakeDiff: b.StakeDiff}
+		}
+		return s
+	}
+
+	coinTypes := txhelpers.SSFeeCoinTypes(toSummaries(sumYear))
+	for ct := range blockData.ExtraInfo.SSFeeTotalsByCoin {
+		coinTypes[ct] = struct{}{}
+	}
+
+	if len(coinTypes) > 0 {
+		sum30S := toSummaries(sum30)
+		sumYearS := toSummaries(sumYear)
+		rewards := make([]types.SKAVoteReward, 0, len(coinTypes))
+		for ct := range coinTypes {
+			var perBlock string
+			if totalStr, ok := blockData.ExtraInfo.SSFeeTotalsByCoin[ct]; ok {
+				if total, parsed := new(big.Int).SetString(totalStr, 10); parsed && voters > 0 {
+					perVote := new(big.Int).Div(total, big.NewInt(voters))
+					perBlock = txhelpers.FormatSKAAtoms(perVote)
+				}
+			}
+			rewards = append(rewards, types.SKAVoteReward{
+				CoinType:  ct,
+				Symbol:    fmt.Sprintf("SKA-%d", ct),
+				PerBlock:  perBlock,
+				Per30Days: txhelpers.AvgSSFeeRate(sum30S, ct, exp.ChainParams.TicketsPerBlock),
+				PerYear:   txhelpers.AvgSSFeeRate(sumYearS, ct, exp.ChainParams.TicketsPerBlock),
+			})
+		}
+		sort.Slice(rewards, func(i, j int) bool { return rewards[i].CoinType < rewards[j].CoinType })
+		p.HomeInfo.SKAVoteRewards = rewards
+	} else {
+		p.HomeInfo.SKAVoteRewards = nil
+	}
+
+	// PoW SKA rewards: per-SKA-type mining reward amounts from the coinbase.
+	if len(blockData.ExtraInfo.SKAPoWRewards) > 0 {
+		powRewards := make([]types.PoWSKAReward, 0, len(blockData.ExtraInfo.SKAPoWRewards))
+		for ct, amountStr := range blockData.ExtraInfo.SKAPoWRewards {
+			powRewards = append(powRewards, types.PoWSKAReward{
+				CoinType: ct,
+				Symbol:   fmt.Sprintf("SKA-%d", ct),
+				Amount:   amountStr,
+			})
+		}
+		sort.Slice(powRewards, func(i, j int) bool { return powRewards[i].CoinType < powRewards[j].CoinType })
+		p.HomeInfo.PoWSKARewards = powRewards
+	}
 
 	// If exchange monitoring is enabled, set the exchange rate.
 	if exp.xcBot != nil {
@@ -587,14 +714,10 @@ func (exp *explorerUI) Store(blockData *blockdata.BlockData, msgBlock *wire.MsgB
 			float64(height), sdiff)
 		p.Lock()
 		p.HomeInfo.ASR = ASR
+		p.HomeInfo.VoteVARReward.PerYear = ASR
 		p.Unlock()
 	}(newBlockData.Height, blockData.CurrentStakeDiff.CurrentStakeDifficulty,
 		blockData.ExtraInfo.CoinSupply) // eval args now instead of in closure
-
-	// Project fund balance, not useful while syncing.
-	if exp.devPrefetch {
-		go exp.updateDevFundBalance()
-	}
 
 	// Trigger a vote info refresh.
 	if exp.voteTracker != nil {
@@ -652,20 +775,6 @@ func (exp *explorerUI) eTagAndLastModified() (eTag string, lastModified time.Tim
 	exp.pageData.RLock()
 	defer exp.pageData.RUnlock()
 	return exp.pageData.eTag, exp.pageData.lastModified
-}
-
-func (exp *explorerUI) updateDevFundBalance() {
-	// yield processor to other goroutines
-	runtime.Gosched()
-
-	devBalance, err := exp.dataSource.DevBalance(context.TODO())
-	if err == nil && devBalance != nil {
-		exp.pageData.Lock()
-		exp.pageData.HomeInfo.DevFund = devBalance.TotalUnspent
-		exp.pageData.Unlock()
-	} else {
-		log.Errorf("explorerUI.updateDevFundBalance failed: %v", err)
-	}
 }
 
 type loggerFunc func(string, ...interface{})
@@ -916,4 +1025,95 @@ func generateRandomString() string {
 		bytes[i] = letters[num.Int64()]
 	}
 	return string(bytes)
+}
+
+// tcBytes is the maximum block size in bytes used as Total Capacity for all
+// fill-bar ratio computations. VAR is guaranteed 10% of TC; all active SKA
+// types share the remaining 90% equally.
+const tcBytes = 393216.0
+
+// computeCoinFills derives per-coin fill bar data from the mempool CoinStats
+// map. VAR is always first in the returned slice; SKA types follow in ascending
+// coin-type order. When stats is empty or nil a single VAR entry with all
+// ratios at 0.0 and status "ok" is returned.
+//
+//nolint:unparam // maxBlockSize comes from the node at runtime; test uses 100.0 for easy math.
+func computeCoinFills(stats map[uint8]types.MempoolCoinStats, maxBlockSize float64) ([]types.CoinFillData, float64, int) {
+	varQuota := maxBlockSize * 0.10
+	skaPool := maxBlockSize * 0.90
+
+	// Collect and sort SKA coin-type keys for deterministic output order.
+	var skaKeys []int
+	var totalSKASize float64
+	for ct, s := range stats {
+		if ct != 0 {
+			skaKeys = append(skaKeys, int(ct))
+			totalSKASize += float64(s.Size)
+		}
+	}
+	sort.Ints(skaKeys)
+	numSKA := len(skaKeys)
+
+	varSize := float64(0)
+	if s, ok := stats[0]; ok {
+		varSize = float64(s.Size)
+	}
+	totalUsed := varSize + totalSKASize
+	totalFillRatio := totalUsed / maxBlockSize
+
+	fillStatus := func(size, quota float64) string {
+		switch {
+		case size <= quota:
+			return "ok"
+		case totalUsed <= maxBlockSize:
+			return "borrowing"
+		default:
+			return "full"
+		}
+	}
+
+	extraOrOverflow := func(size, quota float64, status string) (extra, overflow float64) {
+		if status == "borrowing" {
+			extra = math.Min((size-quota)/maxBlockSize, 1.0)
+		} else if status == "full" {
+			overflow = math.Min((size-quota)/maxBlockSize, 1.0)
+		}
+		return
+	}
+
+	varStatus := fillStatus(varSize, varQuota)
+	varExtra, varOverflow := extraOrOverflow(varSize, varQuota, varStatus)
+
+	fills := make([]types.CoinFillData, 0, 1+numSKA)
+	fills = append(fills, types.CoinFillData{
+		Symbol:            "VAR",
+		GQFillRatio:       math.Min(varSize/varQuota, 1.0),
+		ExtraFillRatio:    varExtra,
+		OverflowFillRatio: varOverflow,
+		GQPositionRatio:   0.10,
+		Status:            varStatus,
+	})
+
+	if numSKA == 0 {
+		return fills, totalFillRatio, 0
+	}
+
+	perSKAQuota := skaPool / float64(numSKA)
+	gqPos := 0.90 / float64(numSKA)
+
+	for _, ct := range skaKeys {
+		s := stats[uint8(ct)]
+		size := float64(s.Size)
+		status := fillStatus(size, perSKAQuota)
+		extra, overflow := extraOrOverflow(size, perSKAQuota, status)
+		fills = append(fills, types.CoinFillData{
+			Symbol:            fmt.Sprintf("SKA-%d", ct),
+			GQFillRatio:       math.Min(size/perSKAQuota, 1.0),
+			ExtraFillRatio:    extra,
+			OverflowFillRatio: overflow,
+			GQPositionRatio:   gqPos,
+			Status:            status,
+		})
+	}
+	return fills, totalFillRatio, numSKA
 }

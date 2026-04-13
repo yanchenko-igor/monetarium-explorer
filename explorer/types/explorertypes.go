@@ -12,13 +12,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/decred/dcrd/blockchain/stake/v5"
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/dcrutil/v4"
-	chainjson "github.com/decred/dcrd/rpc/jsonrpc/types/v4"
-	"github.com/decred/dcrd/wire"
-	"github.com/decred/dcrdata/v8/db/dbtypes"
-	"github.com/decred/dcrdata/v8/txhelpers"
+	"github.com/monetarium/monetarium-explorer/db/dbtypes"
+	"github.com/monetarium/monetarium-explorer/txhelpers"
+	"github.com/monetarium/monetarium-node/blockchain/stake"
+	"github.com/monetarium/monetarium-node/chaincfg"
+	"github.com/monetarium/monetarium-node/dcrutil"
+	chainjson "github.com/monetarium/monetarium-node/rpc/jsonrpc/types"
+	"github.com/monetarium/monetarium-node/wire"
 )
 
 // Types of votes
@@ -129,6 +129,40 @@ type BlockBasic struct {
 	BlockTime      TimeDef `json:"time"`
 	FormattedBytes string  `json:"formatted_bytes"`
 	Total          float64 `json:"total"`
+	// CoinRows holds per-coin row data for the expandable blocks table.
+	// Populated when available; nil means VAR-only (use Total).
+	CoinRows []CoinRowData `json:"coin_rows,omitempty"`
+	// Flattened fields derived from CoinRows for template rendering.
+	VARAmount  string
+	VARTxCount int
+	VARSize    uint32
+	SKAAmount  string
+	SKASubRows []SKASubRow
+}
+
+// FlattenCoinRows populates the template-facing flattened fields (VARAmount,
+// VARTxCount, VARSize, SKAAmount, SKASubRows) from CoinRows. Call this after
+// setting CoinRows.
+func (b *BlockBasic) FlattenCoinRows() {
+	for _, row := range b.CoinRows {
+		if row.CoinType == 0 {
+			b.VARAmount = row.Amount
+			b.VARTxCount = row.TxCount
+			b.VARSize = row.Size
+		} else {
+			b.SKASubRows = append(b.SKASubRows, SKASubRow{
+				TokenType: row.Symbol,
+				TxCount:   row.TxCount,
+				Amount:    row.Amount,
+				Size:      row.Size,
+			})
+			// Use the first SKA row's amount as the summary; callers may
+			// override SKAAmount with an aggregate if needed.
+			if b.SKAAmount == "" {
+				b.SKAAmount = row.Amount
+			}
+		}
+	}
 }
 
 // WebBasicBlock is used for quick DB data without rpc calls
@@ -160,6 +194,7 @@ type TxBasic struct {
 	Treasurybase  bool
 	MixCount      uint32
 	MixDenom      int64
+	SKASent       map[uint8]string
 }
 
 // TrimmedTxInfo for use with /visualblocks
@@ -417,6 +452,8 @@ type Vin struct {
 	DisplayText     string
 	TextIsHash      bool
 	Link            string
+	CoinType        uint8
+	SKAValue        string
 }
 
 // Vout models basic data about a tx output for display
@@ -430,6 +467,56 @@ type Vout struct {
 	OP_TADD         bool
 	Index           uint32
 	Version         uint16
+	CoinType        uint8
+	SKAValue        string
+}
+
+// CoinRowData holds per-coin summary data for the expandable blocks table.
+type CoinRowData struct {
+	CoinType uint8  `json:"coin_type"`
+	Symbol   string `json:"symbol"`
+	TxCount  int    `json:"tx_count"`
+	Amount   string `json:"amount"`
+	Size     uint32 `json:"size"`
+}
+
+// SKASubRow holds per-SKA-type data for the accordion sub-rows in the block table.
+type SKASubRow struct {
+	TokenType string
+	TxCount   int
+	Amount    string
+	Size      uint32
+}
+
+// VARCoinSupply holds VAR circulating supply and target cap.
+type VARCoinSupply struct {
+	Circulating string `json:"circulating"` // 15+18 decimal string (from RPC)
+	Target      string `json:"target"`      // from chain params.MaxSupply (exact value)
+}
+
+// SKACoinSupplyEntry holds per-SKA-type supply data.
+type SKACoinSupplyEntry struct {
+	CoinType      uint8  `json:"coin_type"`      // SKA-n identifier (1, 2, ...)
+	InCirculation string `json:"in_circulation"` // big.Int atom string
+	TotalIssued   string `json:"total_issued"`   // big.Int atom string
+	TotalBurned   string `json:"total_burned"`   // big.Int atom string (placeholder: "0")
+}
+
+// CoinFillData holds per-coin mempool fill bar data.
+type CoinFillData struct {
+	Symbol            string  `json:"symbol"`
+	GQFillRatio       float64 `json:"gq_fill_ratio"`       // 0.0–1.0, fraction of coin's Guaranteed Quota consumed
+	ExtraFillRatio    float64 `json:"extra_fill_ratio"`    // 0.0–1.0, fraction of TC consumed beyond quota (borrowing only)
+	OverflowFillRatio float64 `json:"overflow_fill_ratio"` // 0.0–1.0, fraction of TC that cannot fit (full only)
+	GQPositionRatio   float64 `json:"gq_position_ratio"`   // 0.0–1.0, quota boundary position as fraction of TC
+	Status            string  `json:"status"`              // "ok", "borrowing", "full"
+}
+
+// MempoolCoinStats holds per-coin mempool transaction count, size, and amount.
+type MempoolCoinStats struct {
+	TxCount int    `json:"tx_count"`
+	Size    int32  `json:"size"`
+	Amount  string `json:"amount"` // VAR: int64 atom string; SKA: big.Int atom string
 }
 
 // TrimmedBlockInfo models data needed to display block info on the new home page
@@ -443,6 +530,8 @@ type TrimmedBlockInfo struct {
 	Tickets      []*TrimmedTxInfo
 	Revocations  []*TrimmedTxInfo
 	Transactions []*TrimmedTxInfo
+	// CoinRows holds per-coin row data for the expandable blocks table.
+	CoinRows []CoinRowData
 }
 
 // BlockInfo models data for display on the block page
@@ -458,6 +547,7 @@ type BlockInfo struct {
 	Tickets               []*TrimmedTxInfo
 	Revs                  []*TrimmedTxInfo
 	Votes                 []*TrimmedTxInfo
+	StakeFees             []*TrimmedTxInfo
 	Misses                []string
 	Nonce                 uint32
 	VoteBits              uint16
@@ -475,6 +565,8 @@ type BlockInfo struct {
 	TotalMixed            int64
 	StakeValidationHeight int64
 	Subsidy               *chainjson.GetBlockSubsidyResult
+	// CoinAmounts holds per-coin totals (VAR key=0, SKA-n key=n) as decimal atom strings.
+	CoinAmounts map[uint8]string `json:"coin_amounts,omitempty"`
 }
 
 // Conversion is a representation of some amount of DCR in another index.
@@ -483,31 +575,57 @@ type Conversion struct {
 	Index string  `json:"index"`
 }
 
+// SKAVoteReward holds per-SKA-type staker reward rates expressed as SKA atoms per VAR atom.
+type SKAVoteReward struct {
+	CoinType  uint8  `json:"coin_type"`
+	Symbol    string `json:"symbol"`
+	PerBlock  string `json:"per_block"`   // SKA/VAR ratio for last block, 18dp decimal string
+	Per30Days string `json:"per_30_days"` // 30-day average
+	PerYear   string `json:"per_year"`    // annualised average
+}
+
+// VoteVARReward holds the VAR staker reward rate expressed as VAR earned per
+// VAR staked (i.e. reward/ticketPrice) for last block, 30-day, and yearly.
+type VoteVARReward struct {
+	PerBlock  float64 `json:"per_block"`   // VAR/VAR for the last block
+	Per30Days float64 `json:"per_30_days"` // percentage per 30 days
+	PerYear   float64 `json:"per_year"`    // annualised percentage (ASR)
+}
+
+// PoWSKAReward holds the PoW mining reward for a single SKA coin type.
+type PoWSKAReward struct {
+	CoinType uint8  `json:"coin_type"`
+	Symbol   string `json:"symbol"`
+	Amount   string `json:"amount"` // SKA atoms as decimal string (18 decimals)
+}
+
 // HomeInfo represents data used for the home page
 type HomeInfo struct {
-	CoinSupply            int64                    `json:"coin_supply"`
-	MixedPercent          float64                  `json:"mixed_percent"`
-	StakeDiff             float64                  `json:"sdiff"`
-	NextExpectedStakeDiff float64                  `json:"next_expected_sdiff"`
-	NextExpectedBoundsMin float64                  `json:"next_expected_min"`
-	NextExpectedBoundsMax float64                  `json:"next_expected_max"`
-	IdxBlockInWindow      int                      `json:"window_idx"`
-	IdxInRewardWindow     int                      `json:"reward_idx"`
-	Difficulty            float64                  `json:"difficulty"`
-	DevFund               int64                    `json:"dev_fund"` // legacy treasury address
-	DevAddress            string                   `json:"dev_address"`
-	TreasuryBalance       *dbtypes.TreasuryBalance `json:"treasury_bal"` // new decentralized treasury account
-	TicketReward          float64                  `json:"reward"`
-	RewardPeriod          string                   `json:"reward_period"`
-	ASR                   float64                  `json:"ASR"`
-	NBlockSubsidy         BlockSubsidy             `json:"subsidy"`
-	Params                ChainParams              `json:"params"`
-	PoolInfo              TicketPoolInfo           `json:"pool_info"`
-	TotalLockedDCR        float64                  `json:"total_locked_dcr"`
-	HashRate              float64                  `json:"hash_rate"`
-	HashRateChangeDay     float64                  `json:"hash_rate_change_day"`
-	HashRateChangeMonth   float64                  `json:"hash_rate_change_month"`
-	ExchangeRate          *Conversion              `json:"exchange_rate,omitempty"`
+	CoinSupply            int64                `json:"coin_supply"`
+	MixedPercent          float64              `json:"mixed_percent"`
+	StakeDiff             float64              `json:"sdiff"`
+	NextExpectedStakeDiff float64              `json:"next_expected_sdiff"`
+	NextExpectedBoundsMin float64              `json:"next_expected_min"`
+	NextExpectedBoundsMax float64              `json:"next_expected_max"`
+	IdxBlockInWindow      int                  `json:"window_idx"`
+	IdxInRewardWindow     int                  `json:"reward_idx"`
+	Difficulty            float64              `json:"difficulty"`
+	TicketReward          float64              `json:"reward"`
+	RewardPeriod          string               `json:"reward_period"`
+	ASR                   float64              `json:"ASR"`
+	NBlockSubsidy         BlockSubsidy         `json:"subsidy"`
+	Params                ChainParams          `json:"params"`
+	PoolInfo              TicketPoolInfo       `json:"pool_info"`
+	TotalLockedVAR        float64              `json:"total_locked_var"`
+	HashRate              float64              `json:"hash_rate"`
+	HashRateChangeDay     float64              `json:"hash_rate_change_day"`
+	HashRateChangeMonth   float64              `json:"hash_rate_change_month"`
+	ExchangeRate          *Conversion          `json:"exchange_rate,omitempty"`
+	VoteVARReward         VoteVARReward        `json:"vote_var_reward"`
+	SKAVoteRewards        []SKAVoteReward      `json:"ska_vote_rewards,omitempty"`
+	PoWSKARewards         []PoWSKAReward       `json:"pow_ska_rewards,omitempty"`
+	VARCoinSupply         *VARCoinSupply       `json:"var_coin_supply,omitempty"`
+	SKACoinSupply         []SKACoinSupplyEntry `json:"ska_coin_supply,omitempty"`
 }
 
 // BlockSubsidy is an implementation of chainjson.GetBlockSubsidyResult
@@ -520,16 +638,19 @@ type BlockSubsidy struct {
 
 // TrimmedMempoolInfo is mempool data for the home page.
 type TrimmedMempoolInfo struct {
-	Transactions []*TrimmedTxInfo
-	Tickets      []*TrimmedTxInfo
-	Votes        []*TrimmedTxInfo
-	Revocations  []*TrimmedTxInfo
-	TSpends      []*TrimmedTxInfo
-	TAdds        []*TrimmedTxInfo
-	Subsidy      BlockSubsidy
-	Total        float64
-	Time         int64
-	Fees         float64
+	Transactions   []*TrimmedTxInfo
+	Tickets        []*TrimmedTxInfo
+	Votes          []*TrimmedTxInfo
+	Revocations    []*TrimmedTxInfo
+	TSpends        []*TrimmedTxInfo
+	TAdds          []*TrimmedTxInfo
+	Subsidy        BlockSubsidy
+	Total          float64
+	Time           int64
+	Fees           float64
+	CoinFills      []CoinFillData `json:"coin_fills,omitempty"`
+	TotalFillRatio float64        `json:"total_fill_ratio"`
+	ActiveSKACount int            `json:"active_ska_count"`
 }
 
 // MempoolInfo models data to update mempool info on the home page.
@@ -543,6 +664,8 @@ type MempoolInfo struct {
 	TSpends      []MempoolTx `json:"tspends"`
 	TAdds        []MempoolTx `json:"tadds"`
 	Ident        uint64      `json:"id"`
+	// CoinFills holds per-coin mempool fill bar data for the homepage.
+	CoinFills []CoinFillData `json:"coin_fills,omitempty"`
 }
 
 // DeepCopy makes a deep copy of MempoolInfo, where all the slice and map data
@@ -577,14 +700,17 @@ func (mpi *MempoolInfo) Trim() *TrimmedMempoolInfo {
 	mempoolVotes := TrimMempoolTxs(mpi.Votes)
 
 	data := &TrimmedMempoolInfo{
-		Transactions: FilterRegularTx(mempoolRegularTxs),
-		Tickets:      TrimMempoolTxs(mpi.Tickets),
-		Votes:        FilterUniqueLastBlockVotes(mempoolVotes),
-		Revocations:  TrimMempoolTxs(mpi.Revocations),
-		TSpends:      TrimMempoolTxs(mpi.TSpends),
-		TAdds:        TrimMempoolTxs(mpi.TAdds),
-		Total:        mpi.TotalOut,
-		Time:         mpi.LastBlockTime,
+		Transactions:   FilterRegularTx(mempoolRegularTxs),
+		Tickets:        TrimMempoolTxs(mpi.Tickets),
+		Votes:          FilterUniqueLastBlockVotes(mempoolVotes),
+		Revocations:    TrimMempoolTxs(mpi.Revocations),
+		TSpends:        TrimMempoolTxs(mpi.TSpends),
+		TAdds:          TrimMempoolTxs(mpi.TAdds),
+		Total:          mpi.TotalOut,
+		Time:           mpi.LastBlockTime,
+		CoinFills:      mpi.MempoolShort.CoinFills,
+		TotalFillRatio: mpi.MempoolShort.TotalFillRatio,
+		ActiveSKACount: mpi.MempoolShort.ActiveSKACount,
 	}
 
 	mpi.RUnlock()
@@ -770,6 +896,14 @@ type MempoolShort struct {
 	VotingInfo         VotingInfo          `json:"voting_info"`
 	InvRegular         map[string]struct{} `json:"-"`
 	InvStake           map[string]struct{} `json:"-"`
+	// CoinStats holds per-coin tx count, size, and amount for all mempool txs.
+	CoinStats map[uint8]MempoolCoinStats `json:"coin_stats,omitempty"`
+	// CoinFills holds pre-computed per-coin fill bar data broadcast via WebSocket.
+	CoinFills []CoinFillData `json:"coin_fills,omitempty"`
+	// TotalFillRatio is the ratio of total mempool bytes to TC (unclamped).
+	TotalFillRatio float64 `json:"total_fill_ratio"`
+	// ActiveSKACount is the number of distinct SKA token types in CoinFills.
+	ActiveSKACount int `json:"active_ska_count"`
 }
 
 // LikelyMineable holds the totals for all mempool transactions except for votes
@@ -848,6 +982,17 @@ func (mps *MempoolShort) DeepCopy() *MempoolShort {
 	for s := range mps.InvStake {
 		out.InvStake[s] = struct{}{}
 	}
+
+	if mps.CoinStats != nil {
+		out.CoinStats = make(map[uint8]MempoolCoinStats, len(mps.CoinStats))
+		for k, v := range mps.CoinStats {
+			out.CoinStats[k] = v
+		}
+	}
+
+	out.CoinFills = CopyCoinFillSlice(mps.CoinFills)
+	out.TotalFillRatio = mps.TotalFillRatio
+	out.ActiveSKACount = mps.ActiveSKACount
 
 	return out
 }
@@ -1004,9 +1149,10 @@ type MempoolTx struct {
 	TotalOut  float64        `json:"total"`
 	// Consider atom representation:
 	//TotalOutAmt int64        `json:"total_amount"`
-	Type     string    `json:"Type"`
-	TypeID   int       `json:"typeID"` // stake package types
-	VoteInfo *VoteInfo `json:"vote_info,omitempty"`
+	Type      string           `json:"Type"`
+	TypeID    int              `json:"typeID"` // stake package types
+	VoteInfo  *VoteInfo        `json:"vote_info,omitempty"`
+	SKATotals map[uint8]string `json:"ska_totals,omitempty"`
 }
 
 func (mpt *MempoolTx) DeepCopy() *MempoolTx {
@@ -1017,6 +1163,12 @@ func (mpt *MempoolTx) DeepCopy() *MempoolTx {
 	out.Vin = make([]MempoolInput, len(mpt.Vin))
 	copy(out.Vin, mpt.Vin)
 	out.VoteInfo = mpt.VoteInfo.DeepCopy()
+	if mpt.SKATotals != nil {
+		out.SKATotals = make(map[uint8]string, len(mpt.SKATotals))
+		for k, v := range mpt.SKATotals {
+			out.SKATotals[k] = v
+		}
+	}
 	return &out
 }
 
@@ -1028,6 +1180,17 @@ func CopyMempoolTxSlice(s []MempoolTx) []MempoolTx {
 	for i := range s {
 		out = append(out, *s[i].DeepCopy())
 	}
+	return out
+}
+
+// CopyCoinFillSlice returns a shallow copy of a CoinFillData slice.
+// CoinFillData contains only value types so a shallow copy is sufficient.
+func CopyCoinFillSlice(s []CoinFillData) []CoinFillData {
+	if s == nil {
+		return nil
+	}
+	out := make([]CoinFillData, len(s))
+	copy(out, s)
 	return out
 }
 
