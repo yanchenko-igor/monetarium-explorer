@@ -15,7 +15,7 @@ WORKDIR /app/cmd/dcrdata
 RUN go build -v -o monetarium-explorer .
 
 # Build stage for the frontend assets
-FROM node:20-alpine AS frontend-builder
+FROM node:24-alpine AS frontend-builder
 
 WORKDIR /app/cmd/dcrdata
 
